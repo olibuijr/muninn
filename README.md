@@ -107,7 +107,8 @@ MUNINN_HOST=http://your-server MUNINN_HOOK_REPOS='~/src/api,~/src/acme-*' ./clie
 
 It stores the token in `~/.config/muninn/token`, registers the `muninn` MCP server (Claude Code
 fetches the header through `muninn mcp-header`, so the token is not written into its config),
-installs the hooks and the skill, and runs `muninn doctor`.
+installs the hooks (`~/.claude/settings.json` for Claude Code, `~/.codex/hooks.json` for Codex,
+merged with any hooks already there) and the skill, and runs `muninn doctor`.
 
 MCP tools: `code_search`, `symbol_lookup`, `explain_symbol`, `search_all`, `read_file`,
 `list_repos`, `recall`, `remember`, `forget`. A token only sees the tools its scopes allow.

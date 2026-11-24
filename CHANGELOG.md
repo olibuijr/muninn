@@ -17,6 +17,8 @@
   when dense and full-text search agree on the top hit and the prompt hook's
   `MUNINN_HOOK_MIN_SCORE` / `MUNINN_HOOK_REL_SCORE` mean the same thing for every prompt.
 - `client.sh` no longer prints a stray blank line when the token comes from `MUNINN_TOKEN`.
+- `client.sh` installs the `muninn hook prompt|pre|post` hooks for Codex too (`~/.codex/hooks.json`,
+  merged with existing entries), as the docs already said; before, only Claude Code got them.
 
 ## [0.1.0] - 2026-11-24
 

@@ -22,23 +22,30 @@ MUNINN_HOOK_REPOS=${MUNINN_HOOK_REPOS:-}
 EOF
 chmod 600 ~/.config/muninn/client.env
 
-if command -v claude >/dev/null; then
-  claude mcp remove -s user muninn >/dev/null 2>&1 || true
-  claude mcp add-json -s user muninn "{\"type\":\"http\",\"url\":\"$host:7411/mcp\",\"headersHelper\":\"muninn mcp-header\"}"
-  python3 - <<'PY'
-import json, os
-p = os.path.expanduser("~/.claude/settings.json")
-s = json.load(open(p)) if os.path.exists(p) else {}
+# Merge the muninn hooks into a Claude Code settings.json or a Codex hooks.json (same layout),
+# replacing earlier muninn entries and keeping every other hook.
+install_hooks() {
+  python3 - "$1" "$2" <<'PY'
+import json, os, sys
+p, pre = os.path.expanduser(sys.argv[1]), sys.argv[2]
+s = json.load(open(p)) if os.path.exists(p) and os.path.getsize(p) else {}
 hooks = s.setdefault("hooks", {})
-want = {"UserPromptSubmit": ("", "muninn hook prompt"), "PreToolUse": ("Bash|Grep|Glob", "muninn hook pre"),
+want = {"UserPromptSubmit": ("", "muninn hook prompt"), "PreToolUse": (pre, "muninn hook pre"),
         "PostToolUse": ("mcp__muninn__.*", "muninn hook post")}
 for ev, (matcher, cmd) in want.items():
     lst = [g for g in hooks.get(ev, []) if not any("muninn hook" in h.get("command", "") for h in g.get("hooks", []))]
     g = {"hooks": [{"type": "command", "command": cmd, "timeout": 10}]}
     if matcher: g["matcher"] = matcher
     hooks[ev] = lst + [g]
+os.makedirs(os.path.dirname(p), exist_ok=True)
 json.dump(s, open(p, "w"), indent=2)
 PY
+}
+
+if command -v claude >/dev/null; then
+  claude mcp remove -s user muninn >/dev/null 2>&1 || true
+  claude mcp add-json -s user muninn "{\"type\":\"http\",\"url\":\"$host:7411/mcp\",\"headersHelper\":\"muninn mcp-header\"}"
+  install_hooks ~/.claude/settings.json 'Bash|Grep|Glob'
   echo "Claude Code: MCP server 'muninn' and hooks installed"
 fi
 
@@ -48,7 +55,9 @@ if command -v codex >/dev/null; then
   if ! grep -q '^\[mcp_servers.muninn\]' ~/.codex/config.toml; then
     printf '\n[mcp_servers.muninn]\nurl = "%s:7411/mcp"\nbearer_token_env_var = "MUNINN_TOKEN"\n' "$host" >> ~/.codex/config.toml
   fi
-  echo "Codex: MCP server 'muninn' added; export MUNINN_TOKEN=\$(cat ~/.config/muninn/token) in your shell profile"
+  # Codex names its shell tools shell, local_shell, exec_command or shell_command.
+  install_hooks ~/.codex/hooks.json 'Bash|Grep|Glob|shell|local_shell|exec_command|shell_command'
+  echo "Codex: MCP server 'muninn' and hooks (~/.codex/hooks.json) installed; export MUNINN_TOKEN=\$(cat ~/.config/muninn/token) in your shell profile"
 fi
 
 for d in ~/.claude/skills ~/.codex/skills; do
