@@ -1,0 +1,15 @@
+[Unit]
+Description=Muninn SCIP symbol reindex (rust-analyzer in its own scope, outside indexd)
+After=muninn-indexd.service
+
+[Service]
+Type=oneshot
+# MUNINN_PG_URL, MUNINN_REPOS_DIR, MUNINN_SCIP_REPOS (repos to index)
+EnvironmentFile=%h/.config/muninn/index.env
+ExecStart=/bin/bash %h/.local/share/muninn/scip-reindex.sh
+Nice=19
+# Not app.slice, whose systemd-oomd pressure policy kills long rust-analyzer runs.
+Slice=background.slice
+IOSchedulingClass=idle
+# Waits up to 2 h for MUNINN_SCIP_LOCK, then runs each repo.
+TimeoutStartSec=4h

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Muninn SCIP symbol reindex (04:00 and 20 min after boot)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+OnBootSec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,23 @@
+[Unit]
+Description=Muninn live index watcher (uncommitted edits -> indexd /live within ~1 s)
+After=muninn-indexd.service
+Wants=muninn-indexd.service
+
+[Service]
+EnvironmentFile=%h/.config/muninn/index.env
+# MUNINN_WATCH=repo=/path/to/checkout,... in index.env (or a drop-in) names the checkouts to watch.
+ExecStart=%h/.local/bin/muninn-watch
+Restart=always
+RestartSec=5
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=128M
+TasksMax=32
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target

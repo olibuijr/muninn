@@ -1,0 +1,32 @@
+[Unit]
+Description=Muninn indexd (loopback 127.0.0.1:7410)
+After=network-online.target
+
+[Service]
+# 0600 file: MUNINN_PG_URL, MUNINN_WEBHOOK_SECRET, MUNINN_REPOS_DIR, MUNINN_EMBED_URL, MUNINN_RERANK_URL, MUNINN_INDEXD_TOKEN
+EnvironmentFile=%h/.config/muninn/index.env
+ExecStart=%h/.local/bin/muninn-indexd
+# Two malloc arenas instead of up to eight per core: the blocking query and ingest threads
+# otherwise each keep their own freed memory resident (about 35 MB after a query burst).
+Environment=MALLOC_ARENA_MAX=2
+Restart=always
+RestartSec=5
+Nice=10
+IOSchedulingClass=idle
+# Measured peak: about 440 MB with 20 repos loaded and queries running. Indexer children
+# (rust-analyzer, scip-typescript) share this cgroup; SCIP runs for large Rust workspaces need
+# several GB, so run them with muninn-scip.timer instead.
+MemoryMax=1G
+# An OOM kill of an indexer child must not stop the daemon with it.
+OOMPolicy=continue
+TasksMax=256
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# SCIP runs write scratch checkouts next to the mirrors and use the cargo, rustup and npm caches.
+ReadWritePaths=-%h/.local/share/muninn -%h/.cache -%h/.cargo -%h/.rustup
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Muninn</title>
+<style>
+:root{--bg:#fff;--panel:#f5f5f7;--fg:#1d1d1f;--mut:#6e6e73;--line:#d2d2d7;--tint:#0a64d8;--hl:#fff3b8;--ok:#1f8a3b;--bad:#c9302c}
+@media(prefers-color-scheme:dark){:root{--bg:#1e1e1e;--panel:#2a2a2c;--fg:#f5f5f7;--mut:#98989d;--line:#3a3a3c;--tint:#4c9dff;--hl:#5a4d10;--ok:#30d158;--bad:#ff6961}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;height:100dvh}
+header{display:flex;gap:12px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header b{font-weight:600}
+#status{color:var(--mut);font-size:12px;margin-left:auto;text-align:right}
+#status i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-right:6px}
+#status i.ok{background:var(--ok)}
+.wrap{flex:1;display:flex;min-height:0}
+nav{width:260px;overflow:auto;border-right:1px solid var(--line);background:var(--panel);padding:8px}
+nav .item{padding:6px 8px;border-radius:6px;cursor:pointer}
+nav .item.sel{background:var(--tint);color:#fff}
+nav .item small{display:block;color:var(--mut);font-size:11px}
+nav .item.sel small{color:#e6efff}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar{display:flex;gap:8px;padding:10px 16px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+input,select,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+input[type=search],input#q{flex:1;min-width:160px}
+button{cursor:pointer}button.pri{background:var(--tint);border-color:var(--tint);color:#fff}
+.tabs{display:flex;gap:4px;padding:8px 16px 0}
+.tabs button{border:0;border-radius:6px 6px 0 0;background:none;color:var(--mut)}
+.tabs button.on{color:var(--tint);box-shadow:inset 0 -2px var(--tint)}
+#out{flex:1;overflow:auto;padding:8px 16px}
+.hit{padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.hit .m{color:var(--mut);font-size:12px}.hit .p{color:var(--tint);font-weight:500;word-break:break-all}
+pre,.code{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.hit pre{margin:4px 0 0;max-height:7.5em;overflow:hidden;white-space:pre-wrap;word-break:break-all}
+.muted{color:var(--mut)}
+#file{display:none;flex-direction:column;flex:1;min-height:0}
+#file .top{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+#file .top span{word-break:break-all}
+#src{flex:1;overflow:auto;padding:8px 0}
+.ln{display:flex;white-space:pre}.ln b{flex:none;width:56px;text-align:right;padding-right:12px;color:var(--mut);font-weight:400;user-select:none}
+.ln.h{background:var(--hl)}
+h4{margin:12px 0 4px;font-weight:600}
+@media(max-width:700px){nav{position:absolute;top:44px;bottom:0;left:0;z-index:2;width:78%;display:none}nav.open{display:block}#menu{display:inline-block!important}}
+#menu{display:none}
+</style>
+</head>
+<body>
+<header><button id="menu">Repos</button><b>Muninn</b><div id="status"><i></i><span>connecting</span></div></header>
+<div class="wrap">
+<nav id="repos"></nav>
+<main>
+<div id="browse" style="display:flex;flex-direction:column;flex:1;min-height:0">
+<div class="tabs"><button data-t="search" class="on">Search</button><button data-t="sym">Symbols</button></div>
+<form class="bar" id="form">
+<input id="q" type="search" placeholder="Search code" autocomplete="off">
+<select id="mode"><option>hybrid</option><option>lexical</option><option>semantic</option></select>
+<select id="kind" style="display:none"><option>def</option><option>refs</option><option>callers</option><option>callees</option></select>
+<button class="pri">Go</button>
+</form>
+<div id="out"></div>
+</div>
+<div id="file"><div class="top"><button id="back">Back</button><span class="code" id="fname"></span></div><div id="src" class="code"></div></div>
+</main>
+</div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+let TOKEN="";try{TOKEN=localStorage.getItem("ixweb_token")||""}catch(e){}
+let repos=[],S={tab:"search",q:"",repo:"",mode:"hybrid",kind:"def",file:null};
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+async function api(name,params){
+ if(!TOKEN){const t=prompt("Viewer token");if(!t)throw new Error("token required");TOKEN=t.trim();try{localStorage.setItem("ixweb_token",TOKEN)}catch(e){}}
+ const r=await fetch("/api/"+name+(params?"?"+new URLSearchParams(params):""),{headers:{Authorization:"Bearer "+TOKEN}});
+ if(r.status===401){TOKEN="";try{localStorage.removeItem("ixweb_token")}catch(e){}throw new Error("unauthorized")}
+ if(!r.ok)throw new Error(name+": "+r.status+" "+(await r.text()).slice(0,200));
+ return r;
+}
+const J=async(n,p)=>(await api(n,p)).json();
+function hashOut(){
+ const p=new URLSearchParams();
+ if(S.file){p.set("file",S.file.repo+":"+S.file.path+":"+(S.file.line||0));if(S.file.end>S.file.line)p.set("end",S.file.end);if(S.file.branch)p.set("b",S.file.branch)}
+ else{if(S.q)p.set("q",S.q);if(S.repo)p.set("repo",S.repo);p.set("mode",S.mode);p.set("tab",S.tab);if(S.tab==="sym")p.set("kind",S.kind)}
+ const h="#"+p.toString();if(location.hash!==h)history.replaceState(null,"",h);
+}
+function hashIn(){
+ const p=new URLSearchParams(location.hash.slice(1));
+ S.q=p.get("q")||"";S.repo=p.get("repo")||"";S.mode=p.get("mode")||"hybrid";S.tab=p.get("tab")||"search";S.kind=p.get("kind")||"def";
+ const f=p.get("file");S.file=null;const en=+p.get("end")||0;
+ if(f){const a=f.indexOf(":"),b=f.lastIndexOf(":");if(a>0&&b>a)S.file={repo:f.slice(0,a),path:f.slice(a+1,b),line:+f.slice(b+1)||0,end:en,branch:p.get("b")||""}}
+}
+function sync(){
+ $("#q").value=S.q;$("#mode").value=S.mode;$("#kind").value=S.kind;
+ document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===S.tab));
+ $("#mode").style.display=S.tab==="search"?"":"none";$("#kind").style.display=S.tab==="sym"?"":"none";
+ $("#q").placeholder=S.tab==="search"?"Search code":"Symbol name";
+ $("#browse").style.display=S.file?"none":"flex";$("#file").style.display=S.file?"flex":"none";
+ renderRepos();
+}
+function renderRepos(){
+ const n=$("#repos");n.replaceChildren();
+ const all=el("div","item"+(S.repo?"":" sel"),"All repos");all.onclick=()=>pickRepo("");n.append(all);
+ for(const r of repos){
+  const d=el("div","item"+(S.repo===r.name?" sel":""),r.name+(r.loaded?"":" (not loaded)"));
+  const files=r.branches.reduce((a,b)=>Math.max(a,b.files),0);
+  const pct=r.chunks?Math.round(100*r.embedded/r.chunks):0;
+  d.append(el("small","",files+" files, "+r.chunks+" chunks, "+r.symbols+" symbols, "+pct+"% embedded"));
+  d.onclick=()=>pickRepo(r.name);n.append(d);
+ }
+}
+function pickRepo(r){S.repo=r;$("#repos").classList.remove("open");S.file=null;run()}
+function branchOf(repo){const r=repos.find(x=>x.name===repo);if(!r||!r.branches.length)return "";const b=r.branches.map(x=>x.name);return b.find(x=>x==="main")||b.find(x=>x==="master")||b[0]}
+function openFile(repo,path,line,branch,end){S.file={repo,path,line:line||0,end:end||line||0,branch:branch||branchOf(repo)};loadFile()}
+function hit(repo,path,range,sym,score,snip,line,branch){
+ const d=el("div","hit");
+ d.append(el("div","p",repo+" / "+path+(range?":"+range:"")));
+ const m=[sym,score!=null?"score "+score.toFixed(3):"",branch].filter(Boolean).join("  ");
+ if(m)d.append(el("div","m",m));
+ if(snip)d.append(el("pre","",snip));
+ d.onclick=()=>openFile(repo,path,line,branch,+String(range||"").split("-")[1]);return d;
+}
+async function run(){
+ S.file=null;S.q=$("#q").value.trim();S.mode=$("#mode").value;S.kind=$("#kind").value;sync();hashOut();
+ const out=$("#out");out.replaceChildren();
+ if(!S.q){out.append(el("p","muted","Enter a query."));return}
+ out.append(el("p","muted","Searching..."));
+ try{
+  const f=document.createDocumentFragment();
+  if(S.tab==="search"){
+   const p={q:S.q,mode:S.mode,k:30};if(S.repo)p.repo=S.repo;
+   const d=await J("search",p);
+   for(const h of d.hits||[])f.append(hit(h.repo,h.path,h.start_line+"-"+h.end_line,h.symbol,h.score,h.snippet,h.start_line,h.branch));
+   if(d.busy_repos&&d.busy_repos.length)f.append(el("p","muted","Busy (skipped): "+d.busy_repos.join(", ")));
+   if(!(d.hits||[]).length)f.append(el("p","muted","No hits."));
+  }else{
+   const p={name:S.q,kind:S.kind,limit:100};if(S.repo)p.repo=S.repo;
+   const d=await J("symbol",p);
+   if(d.error)f.append(el("p","muted",d.error));
+   const defs=d.definitions||[];
+   if(S.kind!=="def"&&defs.length){f.append(el("h4","","Definitions"))}
+   for(const x of defs)f.append(hit(x.repo,x.path,x.start_line+"-"+x.end_line,x.name+" ("+x.kind+")",null,x.doc,x.start_line));
+   const rows=d.references||d.callers||d.callees||[];
+   if(S.kind!=="def"){f.append(el("h4","",S.kind[0].toUpperCase()+S.kind.slice(1)+" ("+rows.length+")"));
+    for(const x of rows)f.append(hit(x.repo,x.path,String(x.line),x.caller_name||x.callee_name||x.symbol,null,null,x.line))}
+   if(!defs.length)f.append(el("p","muted","No symbol found."));
+  }
+  out.replaceChildren(f);
+ }catch(e){out.replaceChildren(el("p","muted",e.message))}
+}
+async function loadFile(){
+ sync();hashOut();
+ const f=S.file,src=$("#src");$("#fname").textContent=f.repo+" / "+f.path+(f.branch?" @ "+f.branch:"");
+ src.replaceChildren(el("p","muted","Loading..."));
+ try{
+  const t=await(await api("file",{repo:f.repo,branch:f.branch,path:f.path})).text();
+  const lines=t.split("\n");if(lines[lines.length-1]==="")lines.pop();
+  let end=f.end||f.line;const fr=document.createDocumentFragment();
+  
+  lines.forEach((s,i)=>{const n=i+1,d=el("div","ln"+(f.line&&n>=f.line&&n<=Math.max(f.line,end)?" h":""));d.id="L"+n;d.append(el("b","",n),el("span","",s));fr.append(d)});
+  src.replaceChildren(fr);
+  const g=$("#L"+f.line);if(g)g.scrollIntoView({block:"center"});
+ }catch(e){src.replaceChildren(el("p","muted",e.message))}
+}
+async function status(){
+ const s=$("#status");
+ try{
+  const r=await fetch("/api/readyz",{headers:{Authorization:"Bearer "+TOKEN}});
+  if(r.status===401){s.lastChild.textContent="token required";s.firstChild.className="";return}
+  const d=await r.json(),i=d.ingest||{};
+  s.firstChild.className=r.ok?"ok":"";
+  const parts=[(d.repos??"?")+" repos loaded"];
+  if(i.active_repo)parts.push("ingesting "+i.active_repo+" "+i.files_done+"/"+i.files_total);
+  if(i.queued)parts.push("queued");
+  if(d.to_load&&d.loaded<d.to_load)parts.push("loading "+d.loaded+"/"+d.to_load);
+  s.lastChild.textContent=parts.join(", ");
+ }catch(e){s.lastChild.textContent="offline";s.firstChild.className=""}
+}
+async function loadRepos(){
+ try{repos=(await J("repos")).repos||[]}catch(e){$("#out").replaceChildren(el("p","muted",e.message))}
+ sync();
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;sync();$("#out").replaceChildren();hashOut()});
+$("#form").onsubmit=e=>{e.preventDefault();run()};
+$("#back").onclick=()=>{S.file=null;sync();hashOut()};
+$("#menu").onclick=()=>$("#repos").classList.toggle("open");
+addEventListener("hashchange",()=>{hashIn();sync();S.file?loadFile():S.q&&run()});
+(async()=>{
+ hashIn();sync();await loadRepos();status();setInterval(status,5000);
+ if(S.file){if(!S.file.branch)S.file.branch=branchOf(S.file.repo);loadFile()}else if(S.q)run();
+})();
+</script>
+</body>
+</html>

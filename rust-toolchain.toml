@@ -1,0 +1,6 @@
+# Pin the compiler for this repo. rustup reads this automatically.
+# Exact version, never bare "stable" or bare "nightly".
+[toolchain]
+channel = "1.98.1"
+components = ["clippy", "rustfmt", "rust-analyzer"]
+profile = "minimal"

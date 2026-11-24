@@ -1,0 +1,225 @@
+{
+ "sili": [
+  [
+   "#E48846",
+   "#C9D6DE",
+   50
+  ],
+  [
+   "#EC9C4C",
+   "#C9D6DE",
+   40
+  ],
+  [
+   "#484A58",
+   "#2E4A5C",
+   40
+  ]
+ ],
+ "flag": [
+  [
+   "#E76047",
+   "#02529C",
+   50
+  ]
+ ],
+ "cairn_stone": [
+  [
+   "mat:stone",
+   "#8A8F96"
+  ]
+ ],
+ "rock_large_a": [
+  [
+   "mat:dirt",
+   "#46433F"
+  ],
+  [
+   "mat:grass",
+   "#5C7A2A"
+  ]
+ ],
+ "rock_large_c": [
+  [
+   "mat:dirt",
+   "#46433F"
+  ],
+  [
+   "mat:grass",
+   "#5C7A2A"
+  ]
+ ],
+ "rock_small_a": [
+  [
+   "mat:dirt",
+   "#46433F"
+  ],
+  [
+   "mat:grass",
+   "#5C7A2A"
+  ]
+ ],
+ "rock_small_flat": [
+  [
+   "mat:dirt",
+   "#46433F"
+  ],
+  [
+   "mat:grass",
+   "#5C7A2A"
+  ]
+ ],
+ "rock_tall_a": [
+  [
+   "mat:dirt",
+   "#2B2D30"
+  ],
+  [
+   "mat:grass",
+   "#565B62"
+  ],
+  [
+   "mat:_defaultMat",
+   "#2B2D30"
+  ]
+ ],
+ "rock_tall_e": [
+  [
+   "mat:dirt",
+   "#2B2D30"
+  ],
+  [
+   "mat:grass",
+   "#565B62"
+  ],
+  [
+   "mat:_defaultMat",
+   "#2B2D30"
+  ]
+ ],
+ "cliff_block": [
+  [
+   "mat:dirt",
+   "#5A5550"
+  ],
+  [
+   "mat:grass",
+   "#5C7A2A"
+  ]
+ ],
+ "bush": [
+  [
+   "mat:grass",
+   "#4E6B2E"
+  ]
+ ],
+ "bush_small": [
+  [
+   "mat:grass",
+   "#4E6B2E"
+  ]
+ ],
+ "grass_tuft": [
+  [
+   "mat:grass",
+   "#5C7A2A"
+  ]
+ ],
+ "log": [
+  [
+   "mat:woodBark",
+   "#6B4A2F"
+  ],
+  [
+   "mat:woodInner",
+   "#C9A46E"
+  ]
+ ],
+ "tent": [
+  [
+   "mat:colorRed",
+   "#E0672A"
+  ],
+  [
+   "mat:wood",
+   "#8A5A34"
+  ]
+ ],
+ "campfire": [
+  [
+   "mat:stone",
+   "#7A7A78"
+  ]
+ ],
+ "skua": [
+  [
+   "#E55F48",
+   "#5A4632",
+   70
+  ],
+  [
+   "#7366CE",
+   "#3B2E22",
+   70
+  ],
+  [
+   "#FFAA41",
+   "#8A7357",
+   30
+  ],
+  [
+   "#FFCB5C",
+   "#3B2E22",
+   30
+  ],
+  [
+   "#73758B",
+   "#2A2A2A",
+   25
+  ]
+ ],
+ "climber_snjotittlingur": [
+  [
+   "geo:absx>0.65",
+   "#2B2622"
+  ],
+  [
+   "r>=250",
+   "#EDEDE8"
+  ],
+  [
+   "#EB9B4C",
+   "#1E1E1E",
+   60
+  ],
+  [
+   "#DF7941",
+   "#1E1E1E",
+   60
+  ]
+ ],
+ "climber_refur": [
+  [
+   "#E58A46",
+   "#6F5F52",
+   60
+  ],
+  [
+   "#A85E41",
+   "#3D3329",
+   40
+  ],
+  [
+   "#E8B894",
+   "#D9CFC2",
+   40
+  ]
+ ],
+ "climber_isbjorn": [
+  [
+   "#E0E0EC",
+   "#EDE6DA",
+   60
+  ]
+ ]
+}

@@ -1,0 +1,12 @@
+[package]
+name = "muninn-scip"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+muninn-core = { version = "0.1.0", path = "../muninn-core" }
+serde_json = "1.0.151"
+
+[[bin]]
+name = "muninn-scip"
+path = "src/main.rs"

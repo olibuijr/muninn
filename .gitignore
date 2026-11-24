@@ -1,0 +1,9 @@
+target/
+/data/
+/dist/
+scripts/eval/cases-*.tsv
+scripts/eval/*.json
+
+.claude/
+.worktrees/
+target-wt/

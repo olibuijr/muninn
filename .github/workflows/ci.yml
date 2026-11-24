@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test
+        run: cargo test --workspace --locked
+      - name: Warnings
+        run: cargo clippy --workspace --locked --all-targets -- -D warnings
+      - name: Shell syntax
+        run: |
+          bash -n release.sh deploy/install.sh deploy/client.sh deploy/scip-reindex.sh
+          sh -n deploy/backfill.sh deploy/hooks/reference-transaction

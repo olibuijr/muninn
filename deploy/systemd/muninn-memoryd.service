@@ -1,0 +1,14 @@
+[Unit]
+Description=Muninn memoryd (loopback 127.0.0.1:7412): agent memory
+After=network-online.target
+
+[Service]
+EnvironmentFile=%h/.config/muninn/index.env
+EnvironmentFile=-%h/.config/muninn/memoryd.env
+ExecStart=%h/.local/bin/muninn-memoryd
+Restart=on-failure
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=Muninn MCP server (loopback 127.0.0.1:7411)
+After=muninn-indexd.service
+Wants=muninn-indexd.service
+
+[Service]
+EnvironmentFile=%h/.config/muninn/index.env
+ExecStart=%h/.local/bin/muninn-mcp
+Restart=always
+RestartSec=5
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=512M
+TasksMax=128
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target

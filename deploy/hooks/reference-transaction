@@ -1,0 +1,17 @@
+#!/bin/sh
+# Install as hooks/reference-transaction in a bare mirror (backfill.sh links it). Fires on push and
+# fetch ref updates and tells indexd, signed with MUNINN_WEBHOOK_SECRET, which branch moved.
+[ "$1" = committed ] || exit 0
+SECRET_FILE="${MUNINN_INDEX_SECRET_FILE:-$HOME/.config/muninn/index.env}"
+SECRET=$(sed -n 's/^MUNINN_WEBHOOK_SECRET=//p' "$SECRET_FILE")
+URL=$(sed -n 's/^MUNINN_INDEXD_URL=//p' "$SECRET_FILE"); URL=${URL:-http://127.0.0.1:7410}
+repo=$(basename "$(git rev-parse --absolute-git-dir)" .git)
+while read -r old new ref; do
+  case "$ref" in refs/heads/*) ;; *) continue ;; esac
+  case "$new" in 0000000000000000000000000000000000000000) continue ;; esac
+  body=$(printf '{"ref":"%s","before":"%s","after":"%s","repository":{"name":"%s"}}' "$ref" "$old" "$new" "$repo")
+  sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+  curl -s -m 5 -o /dev/null -X POST -H "X-Gitea-Signature: $sig" -H 'Content-Type: application/json' \
+    -d "$body" "$URL/webhook/push" </dev/null >/dev/null 2>&1 &
+done
+exit 0

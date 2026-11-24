@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="sharp" data-ground="sky" data-buttons="pill" data-motion>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Muninn: a self-hosted code index and memory for AI coding agents</title>
+<meta name="description" content="Muninn indexes your git repos and remembers what your agents learned, so Claude Code, Codex and any MCP client find code by meaning and recall past decisions. Free and MIT-licensed.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Muninn: a self-hosted code index and memory for AI coding agents">
+<meta property="og:description" content="Code search by meaning, symbols and callers, and a memory every agent session shares. Free and MIT-licensed.">
+<meta property="og:image" content="https://muninn.olibuijr.com/share.jpg">
+<meta property="og:url" content="https://muninn.olibuijr.com/">
+<link rel="canonical" href="https://muninn.olibuijr.com/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f4f5f8">
+<meta name="site-kind" content="software">
+<meta name="page-type" content="software">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..700&family=Figtree:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/system.css">
+<link rel="stylesheet" href="assets/ui/cards.css">
+<link rel="stylesheet" href="assets/motion/motion.css">
+<link rel="stylesheet" href="assets/backgrounds/backgrounds.css">
+<link rel="stylesheet" href="assets/layout/layout.css">
+<link rel="stylesheet" href="assets/icons/icon.css">
+<!-- <html lang="en" data-radius="sharp">; keep this <style> after the links: layout.css resets --ly-scale -->
+<style>
+:root {
+  --p-bg: #f4f5f8; --p-surface: #e6e9f0; --p-ink: #0b1b3f; --p-muted: #535e78;
+  --p-accent: #b45309; --p-accent-ink: #ffffff; --p-action: #0b1b3f; --p-action-ink: #ffffff;
+  --p-inv-bg: #0b1b3f; --p-inv-surface: #13264f; --p-inv-ink: #f4f5f8; --p-inv-muted: #9aa5bf;
+  --p-inv-accent: #ff9b3d; --p-inv-accent-ink: #0b1b3f; --p-inv-action: #f4f5f8; --p-inv-action-ink: #0b1b3f;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-text: "Figtree", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --display-weight: 400;
+  --display-tracking: -0.03em;
+  --display-tracking-xl: -0.04em;
+  --ly-scale: 0.98;
+}
+</style>
+<link rel="stylesheet" href="assets/ui/base.css">
+<link rel="stylesheet" href="assets/ui/window/fragment.css">
+<link rel="stylesheet" href="assets/ui/terminal-run/fragment.css">
+<script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
+<script src="assets/backgrounds/backgrounds.js"></script>
+<script>document.documentElement.classList.add('mo-js');setTimeout(()=>document.documentElement.classList.add('mo-safe'),2500)</script>
+<link rel="modulepreload" href="assets/moments/moments.js">
+<link rel="modulepreload" href="assets/moments/lib.js">
+<link rel="modulepreload" href="assets/moments/liquid-type/moment.js">
+<link rel="stylesheet" href="assets/moments/liquid-type/moment.css">
+<style>
+  .nav__logo img { width: 28px; height: 28px; }
+  /* hero collage pieces: sized in % of the collage, text in container units */
+  .ly-collage { container-type: inline-size; }
+  .ly-collage .ly-piece { box-shadow: 0 1px 2px rgb(11 27 63 / .08), 0 22px 48px -22px rgb(11 27 63 / .45); background: #fff; color: var(--p-ink); overflow: hidden; }
+  .ly-piece.shot { background: #fff; }
+  .ly-piece.shot img { width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; }
+  .pc { padding: 3.4cqw; display: grid; align-content: start; gap: 1.8cqw; font: 400 max(13px, 2cqw)/1.35 var(--font-text); }
+  .pc .lbl { color: var(--p-muted); font: 500 max(13px, 1.8cqw)/1.2 var(--font-text); }
+  .pc .ln { display: flex; justify-content: space-between; gap: 2cqw; padding-top: 1.4cqw; border-top: 1px solid #e3e7ef; }
+  .pc .ln span:last-child { font-family: var(--font-mono); white-space: nowrap; }
+  .pc-term { background: #0b1b3f !important; color: #f4f5f8 !important; font: 400 max(13px, 1.9cqw)/1.55 var(--font-mono); padding: 3.4cqw; display: grid; align-content: start; white-space: pre; }
+  .pc-term .p { color: #ff9b3d; } .pc-term .m { color: #9aa5bf; } .pc-term .c { color: #38bdf8; }
+
+  /* the product shot */
+  .mm-shot { margin-top: var(--s-7); border-radius: var(--u-r); overflow: hidden; border: 1px solid rgb(11 27 63 / .12); box-shadow: 0 30px 60px -30px rgb(11 27 63 / .5); background: #fff; }
+  .mm-shot img { display: block; width: 100%; height: auto; }
+  .mm-points { list-style: none; padding: 0; margin: var(--s-7) 0 0; }
+  .mm-points li { display: grid; gap: 6px; padding-top: var(--s-4); border-top: 1px solid rgb(11 27 63 / .14); }
+  .mm-points b { font: 500 var(--t-lead)/1.25 var(--font-display); }
+  @media (max-width: 1023px) { .mm-points li { grid-column: 1 / -1; } }
+
+  /* feature panels */
+  #memory .panel { --p-h: 300px; }
+  #memory .panel > .ui-panel, #install .panel > .ui-panel, #agents .panel > .ui-panel, #faq .panel > .ui-panel { height: 100%; }
+  .dk-code { margin: 0; padding: 16px 18px; font: 400 13px/1.7 var(--font-mono); white-space: pre; overflow: hidden; }
+  .dk-code .p { color: var(--p-accent); } .dk-code .m { color: var(--p-muted); } .dk-code .ok { color: #1a7f4b; }
+  .mm-bars { list-style: none; margin: 0; padding: 14px 18px; display: grid; gap: 10px; font: 400 13px/1.2 var(--font-mono); }
+  .mm-bars li { display: grid; grid-template-columns: 150px 1fr 44px; gap: 12px; align-items: center; }
+  .mm-bars i { display: block; height: 8px; background: #e6e9f0; position: relative; }
+  .mm-bars i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--p-accent); }
+  .mm-bars li.hit b { color: var(--p-accent); }
+  .mm-bars b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mm-bars span { text-align: right; }
+  .mm-bars .h { color: var(--p-muted); font-family: var(--font-text); font-size: 12px; }
+  @media (max-width: 639px) { .pc-term { white-space: normal; } .pc-term > span { display: block; } #memory .panel { --p-h: 164px; } #install .panel { --p-h: 200px; } .dk-code { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px 16px; } .mm-bars li { grid-template-columns: 100px 1fr 40px; } }
+
+  /* the statement moment */
+  #open > .wrap { display: grid; align-content: center; height: 100%; }
+  #open .mo-lt__type { font-size: clamp(56px, 13vw, 200px); line-height: .98; letter-spacing: var(--display-tracking-xl); margin: 0; }
+  #install .panel { --p-h: 240px; }
+  #install .dk-code { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #faq .panel { --p-h: 330px; }
+  #agents .panel { --p-h: 560px; }
+  .mm-tools { list-style: none; padding: 0; margin: var(--s-4) 0 0; display: grid; gap: 0; }
+  .mm-tools li { display: grid; grid-template-columns: 140px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid rgb(11 27 63 / .14); }
+  .mm-tools code { color: var(--p-accent); }
+  @media (max-width: 639px) { #search .mm-shot img { height: 92vh; object-fit: cover; object-position: top; } }
+  #agents code, #faq code { font-family: var(--font-mono); font-size: .92em; }
+  @media (max-width: 639px) { #agents .panel { --p-h: 620px; } }
+  .dk-stack { list-style: none; padding: 0; margin: var(--s-8) 0 0; }
+  .dk-stack li { display: flex; gap: var(--s-4); align-items: flex-start; padding-top: var(--s-5); border-top: 1px solid rgb(11 27 63 / .14); }
+  .dk-stack li span { display: grid; gap: 4px; }
+  .dk-stack img { width: 40px; height: 40px; object-fit: contain; flex: none; }
+  .dk-stack b { font-weight: 500; font-family: var(--font-display); font-size: var(--t-lead); }
+  @media (max-width: 1023px) { .dk-stack li { grid-column: 1 / -1; } }
+  h1, h2, .mo-lt__type { font-stretch: 84%; }
+</style>
+</head>
+<body>
+<!-- type: software
+     deal: hero triptych, nav nav-mega, close close-type, footer footer-columns, rhythm space, buttons pill, mark: the Muninn raven with a wing of code lines (codex concept, redrawn as SVG), grounds none
+     palette night-raven (a cool grey ground, the mark's deep navy as ink and one amber accent from its eye, read as a quiet, dependable tool); type bricolage
+     product shots: the real Muninn index viewer, captured from a demo instance indexing muninn, ripgrep and axum
+     moments: liquid-type on #open -->
+<header class="nav">
+  <div class="wrap nav__bar">
+    <a class="skip-link" href="#search">Skip to content</a>
+    <a class="nav__logo" href="#top"><img src="favicon.svg" alt="" width="28" height="28">Muninn</a>
+    <nav class="nav__links" aria-label="Main">
+      <div class="nav__item">
+        <a class="nav__link" href="#search">Product <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <div class="nav__menu">
+          <div class="wrap grid">
+            <div class="menu-col span-3">
+              <p class="t-label">Code index</p>
+              <a href="#search">Code search<span>Keywords, meaning and a reranker</span></a>
+              <a href="#search">Symbols<span>Definitions, references and callers</span></a>
+            </div>
+            <div class="menu-col span-3">
+              <p class="t-label">Memory</p>
+              <a href="#memory">Shared memory<span>Decisions every session can recall</span></a>
+              <a href="#agents">MCP and CLI<span>JSON for agents and scripts</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav__item"><a class="nav__link" href="#memory">Memory</a></div>
+      <div class="nav__item"><a class="nav__link" href="#agents">Agents</a></div>
+      <div class="nav__item"><a class="nav__link" href="#faq">Questions</a></div>
+      <div class="nav__item"><a class="nav__link" href="https://github.com/olibuijr/muninn">GitHub</a></div>
+    </nav>
+    <div class="nav__actions">
+      <a class="btn btn--primary" href="#install">Install Muninn</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero hero--triptych" data-enter aria-labelledby="hero-h">
+    <div class="wrap"><div class="hero-text grid hero__grid">
+      <div class="span-3">
+        <h1 id="hero-h">Code search and memory for AI agents</h1>
+        <p class="hero__lead">Muninn indexes your git repos on every push and remembers what your agents learned. It runs on your own Linux server, for Claude Code, Codex and any MCP client.</p>
+      </div>
+      <div class="ly-collage span-6 start-4" role="img" aria-label="Muninn's index viewer answering a question about ripgrep, the prompt hook adding a remembered fact, the callers of a function and a file view">
+        <div class="ly-collage__set is-on">
+          <div class="ly-piece shot" style="left: 4%; top: 6%; width: 70%; height: 58%"><img src="img/search.jpg" alt="" width="1600" height="1000"></div>
+          <div class="ly-piece pc-term" style="left: 38%; top: 58%; width: 58%"><span><span class="p">you</span> how do we cut a release?</span>
+<span class="m">UserPromptSubmit · muninn hook prompt</span>
+<span>recall: <span class="c">bump the version,</span></span>
+<span class="c">add a CHANGELOG section, run release.sh</span></div>
+        </div>
+        <div class="ly-collage__set" aria-hidden="true">
+          <div class="ly-piece shot" style="left: 4%; top: 6%; width: 70%; height: 58%"><img src="img/symbols.jpg" alt="" width="1600" height="1000"></div>
+          <div class="ly-piece pc" style="left: 46%; top: 56%; width: 50%">
+            <span class="lbl">ripgrep · symbols</span>
+            <div class="ln"><span>Definitions</span><span>5,605</span></div>
+            <div class="ln"><span>Call edges</span><span>23,824</span></div>
+            <div class="ln"><span>Callers of search_path</span><span>10</span></div>
+          </div>
+        </div>
+        <div class="ly-collage__set" aria-hidden="true">
+          <div class="ly-piece shot" style="left: 4%; top: 6%; width: 70%; height: 58%"><img src="img/file.jpg" alt="" width="1600" height="1000"></div>
+          <div class="ly-piece pc" style="left: 40%; top: 56%; width: 56%">
+            <span class="lbl">Pushed just now</span>
+            <div class="ln"><span>git push to the mirror</span><span>0 ms</span></div>
+            <div class="ln"><span>changed files reindexed</span><span>1</span></div>
+            <div class="ln"><span>searchable after</span><span>42 ms</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="span-3 start-10 hero__cta"><a class="btn btn--primary" href="#install">Install Muninn</a></div>
+    </div></div>
+  </section>
+
+  <section class="section" style="--hm: 2" id="search" aria-labelledby="search-h">
+    <div class="wrap">
+      <div class="grid">
+        <h2 id="search-h" class="span-6">Search every repo by what the code does</h2>
+        <p class="span-6 start-7 t-lead">Ask in plain words or paste an exact name. Muninn combines keyword and meaning search, reranks the best hits and follows symbols to their callers.</p>
+      </div>
+      <div class="mm-shot"><picture><source media="(max-width: 639px)" srcset="img/search-phone.jpg"><img loading="lazy" src="img/search.jpg" alt="Muninn's index viewer answering &quot;how does ripgrep detect binary files&quot; with ripgrep's binary tests, its guide and the BinaryMode type" width="1600" height="1000"></picture></div>
+      <ul class="mm-points grid">
+        <li class="span-4"><b>Chunks that follow the code</b>Files are split at functions, impls and classes, so a hit is a whole unit of code.</li>
+        <li class="span-4"><b>Callers, not just matches</b>SCIP indexes give definitions, references, callers and callees for Rust and TypeScript.</li>
+        <li class="span-4"><b>Fresh on every push</b>A git hook reindexes the changed files; uncommitted edits can be indexed within a second.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section g2" id="memory" aria-labelledby="memory-h">
+    <div class="wrap">
+      <div class="group">
+        <div class="section-head">
+          <h2 id="memory-h">One memory for every session. <span class="muted">What one agent learns, the next one already knows.</span></h2>
+        </div>
+        <div class="grid">
+          <article class="card card--row card--open span-6">
+            <h3>Recall puts the right memory first</h3>
+            <p>A reranker orders the memories, so the fact that answers the prompt comes first.</p>
+            <div class="panel"><div class="ui ui-panel" style="width:100%">
+              <ul class="mm-bars">
+                <li class="h"><span style="text-align:left">"why did the test fail on tmpfs"</span><span></span><span>score</span></li>
+                <li class="hit"><b>root cause</b><i style="--w: 92%"></i><span>0.92</span></li>
+                <li><b>binary files</b><i style="--w: 45%"></i><span>0.45</span></li>
+                <li><b>axum handlers</b><i style="--w: 45%"></i><span>0.45</span></li>
+                <li><b>pull requests</b><i style="--w: 44%"></i><span>0.44</span></li>
+                <li><b>release steps</b><i style="--w: 43%"></i><span>0.43</span></li>
+              </ul>
+            </div></div>
+          </article>
+          <article class="card card--row card--open span-6">
+            <h3>The prompt hook brings memories in</h3>
+            <p>Before each prompt, the hook adds the memories that match it.</p>
+            <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="m"># ~/.claude/settings.json</span>
+"UserPromptSubmit": [{ "hooks": [
+  { "type": "command", "command": "muninn hook prompt" } ] }]
+
+<span class="m"># added to the conversation</span>
+<span class="p">muninn recall for this prompt:</span>
+- <span>[</span>procedural] How to cut a release: bump the
+  version, add a CHANGELOG section, run release.sh</pre></div></div>
+          </article>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card card--row card--open span-6">
+          <h3>Memory stays clean on its own</h3>
+          <p>Duplicates are merged, conflicts wait for review, and secrets are refused.</p>
+          <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="p">$</span> muninn remember "Deploys need the staging tag" \
+    --type procedural --source issue:API-212
+active d19145cb
+<span class="p">$</span> muninn remember "api token=sk-live-4f9a..."
+<span class="m">rejected: text looks like a secret
+(credential assignment); store names only</span>
+<span class="p">$</span> muninn review list
+0 item(s) in review</pre></div></div>
+        </article>
+        <article class="card card--row card--open span-6">
+          <h3>Memory is scoped to each token&#39;s projects</h3>
+          <p>Postgres row-level security limits every query to the projects of its token.</p>
+          <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="p">$</span> muninn doctor
+<span class="ok">ok</span>   indexd: http://server:7410/healthz
+<span class="ok">ok</span>   memoryd: http://server:7412/healthz
+<span class="ok">ok</span>   index token: 3 repos indexed
+<span class="ok">ok</span>   memory token: recall works</pre></div></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="open" aria-labelledby="open-h">
+    <div class="wrap">
+      <div data-moment="liquid-type" class="section-head" style="max-width:none">
+        <h2 id="open-h" class="mo-lt__type">Muninn is open source</h2>
+        <p class="t-lead">MIT licence. Use it, fork it, change it and ship it. Issues and pull requests are welcome.</p>
+        <a class="link" href="https://github.com/olibuijr/muninn">See the source on GitHub</a>
+      </div>
+      <ul class="dk-stack grid">
+        <li class="span-4"><img loading="lazy" class="ic ic-40 ic-ink" src="assets/icons/rust.svg" alt="" width="40" height="40"><span><b>Written in Rust</b>Static binaries for the index, memory, MCP server, viewer and CLI.</span></li>
+        <li class="span-4"><img loading="lazy" class="ic ic-40" src="assets/icons/postgres.svg" alt="" width="40" height="40"><span><b>Stored in Postgres</b>pgvector holds the embeddings; row-level security guards the memory.</span></li>
+        <li class="span-4"><img loading="lazy" class="ic ic-40" src="assets/icons/linux.svg" alt="" width="33" height="40"><span><b>Runs on your own server</b>Local models through llama.cpp. Your code never leaves your network.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" style="--hm: 2" id="install" aria-labelledby="install-h">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="install-h">Install Muninn in 3 steps</h2>
+        <p>Static binaries for x86_64 Linux with systemd. You need Postgres 16 or later with pgvector. The README covers the database and tokens.</p>
+      </div>
+      <div class="grid">
+        <article class="card card--row span-4">
+          <span class="step-num">1</span>
+          <h3>Install the services</h3>
+          <p>Systemd user services for the index, memory, MCP server and viewer.</p>
+          <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="p">$</span> curl -LO https://github.com/olibuijr/muninn/releases/latest/download/muninn-x86_64-linux.tar.gz
+<span class="p">$</span> tar xzf muninn-x86_64-linux.tar.gz &amp;&amp; cd muninn-x86_64-linux
+<span class="p">$</span> mkdir -p ~/.config/muninn &amp;&amp; cp index.env.example ~/.config/muninn/index.env
+<span class="p">$</span> ./install.sh</pre></div></div>
+        </article>
+        <article class="card card--row span-4">
+          <span class="step-num">2</span>
+          <h3>Start the models and add repos</h3>
+          <p>An embedding model and a reranker, then a mirror of each repo.</p>
+          <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="p">$</span> llama-server -hf ggml-org/embeddinggemma-300M-GGUF --embeddings --port 8084
+<span class="p">$</span> llama-server -hf gpustack/bge-reranker-v2-m3-GGUF --reranking --port 8085
+<span class="p">$</span> git clone --mirror https://github.com/you/api ~/.local/share/muninn/repos/api.git
+<span class="p">$</span> ~/.local/share/muninn/backfill.sh api</pre></div></div>
+        </article>
+        <article class="card card--row span-4">
+          <span class="step-num">3</span>
+          <h3>Connect each machine</h3>
+          <p>Adds the MCP server, hooks and agent skill to Claude Code and Codex.</p>
+          <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="p">$</span> MUNINN_HOST=http://server ./client.sh
+<span class="p">$</span> muninn doctor
+<span class="m"># viewer: http://server:7415</span></pre></div></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="--hm: 2" id="agents" aria-labelledby="agents-h">
+    <div class="wrap">
+      <div class="grid grid--top">
+        <div class="span-5 stack-4">
+          <h2 id="agents-h">Muninn for AI agents</h2>
+          <p>Agents search code and memory through nine MCP tools, or the CLI with <code>--json</code>. Muninn also ships a skill that teaches agents when to search, what to remember and how to fix a broken setup.</p>
+          <ul class="mm-tools">
+            <li><code>code_search</code><span>Find code by keywords or meaning</span></li>
+            <li><code>symbol_lookup</code><span>Where a name is defined and used</span></li>
+            <li><code>explain_symbol</code><span>A symbol with its callers and callees</span></li>
+            <li><code>search_all</code><span>Code, symbols and memory in one query</span></li>
+            <li><code>read_file</code><span>A file or a line range from any repo</span></li>
+            <li><code>recall</code><span>Memories that answer a question</span></li>
+            <li><code>remember</code><span>Store a decision, root cause or how-to</span></li>
+          </ul>
+          <a class="link" href="https://github.com/olibuijr/muninn/blob/main/skills/muninn/SKILL.md">Read the agent skill</a>
+        </div>
+        <div class="span-6 start-7">
+          <div class="panel"><div class="ui ui-panel" style="width:100%"><pre class="dk-code"><span class="p">$</span> muninn --json symbol search_path --repo ripgrep
+{"hits":[{"name":"search_path","kind":"method",
+  "repo":"ripgrep","path":"crates/core/search.rs",
+  "start_line":375,"end_line":385}, ...]}
+
+<span class="p">$</span> muninn --json recall "how do we cut a release" -k 1
+{"hits":[{"type":"procedural","score":0.92,
+  "text":"How to cut a release: bump the ...",
+  "source":"session:2026-11-22-release"}]}
+
+<span class="p">$</span> muninn --json doctor
+{"ok":true,"checks":<span>[</span>...]}</pre></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="--hm: 2" id="faq" aria-labelledby="faq-h">
+    <div class="wrap">
+      <div class="section-head"><h2 id="faq-h">Questions about Muninn</h2></div>
+      <div class="grid grid--top">
+      <div class="faq span-6">
+        <div class="faq__item"><h3>Which agents work with Muninn?</h3><p>Claude Code and Codex through the MCP server and hooks. Any agent that speaks MCP or can run a command can search and remember.</p></div>
+        <div class="faq__item"><h3>Does my code leave the server?</h3><p>No. Indexing, embeddings and reranking run on your own machines. Muninn only reads the bare mirrors you give it.</p></div>
+        <div class="faq__item"><h3>Which languages are supported?</h3><p>Search works on any text. Chunks follow the syntax of Rust, TypeScript, JavaScript, Python, Go and more; callers and callees come from SCIP, built in for Rust and TypeScript.</p></div>
+        <div class="faq__item"><h3>What hardware do the Muninn models need?</h3><p>The embedding model and reranker are about 1 GB together and run on a CPU. A GPU makes the first index of a large repo much faster.</p></div>
+      </div>
+      <div class="span-6 start-7 stack-4">
+        <div class="mm-shot" style="margin-top:0"><picture><source media="(max-width: 639px)" srcset="img/symbols-phone.jpg"><img loading="lazy" src="img/symbols.jpg" alt="The callers of ripgrep's search_path in Muninn's index viewer" width="1600" height="1000"></picture></div>      </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer closing" id="contact" aria-labelledby="close-h">
+  <div class="wrap">
+    <div class="closing__cta close--type">
+      <div class="section-head">
+        <h2 id="close-h">Install Muninn</h2>
+        <p>Free, MIT-licensed and built in Rust. One server, and one command on each machine.</p>
+      </div>
+      <a class="btn btn--primary btn--xl btn--wide" href="#install">Install Muninn<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
+    </div>
+    <div class="closing__links">
+      <div class="grid">
+        <div class="span-4 stack-4">
+          <a class="nav__logo" href="#top"><img loading="lazy" src="favicon.svg" alt="" width="28" height="28">Muninn</a>
+          <p class="footer__lede">A self-hosted code index and shared memory for Claude Code, Codex and other AI agents.</p>
+        </div>
+        <div class="span-2 start-7 footer__col"><h3>Product</h3><ul><li><a href="#search">Code search</a></li><li><a href="#memory">Memory</a></li><li><a href="#install">Install</a></li><li><a href="#agents">AI agents</a></li></ul></div>
+        <div class="span-2 footer__col"><h3>Docs</h3><ul><li><a href="https://github.com/olibuijr/muninn#readme">README</a></li><li><a href="https://github.com/olibuijr/muninn/blob/main/skills/muninn/SKILL.md">Agent skill</a></li><li><a href="https://github.com/olibuijr/muninn/blob/main/CHANGELOG.md">Changelog</a></li></ul></div>
+        <div class="span-2 footer__col"><h3>Project</h3><ul><li><a href="https://github.com/olibuijr/muninn">Source</a></li><li><a href="https://github.com/olibuijr/muninn/issues">Issues</a></li><li><a href="https://github.com/olibuijr/muninn/blob/main/LICENSE">MIT licence</a></li></ul></div>
+      </div>
+      <div class="footer__legal">
+        <span>&copy; 2026 Muninn contributors. Released under the MIT licence. Claude Code and Codex are trademarks of their owners.</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="assets/system.js"></script>
+<script type="module" src="assets/motion/motion.js"></script>
+<script type="module" src="assets/layout/layout.js"></script>
+</body>
+</html>

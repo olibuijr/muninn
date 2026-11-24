@@ -1,0 +1,10 @@
+[Unit]
+Description=Muninn memory lifecycle (consolidate episodic memories, expire TTL, re-embed stale vectors)
+After=muninn-memoryd.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/muninn/index.env
+EnvironmentFile=-%h/.config/muninn/memoryd.env
+ExecStart=%h/.local/bin/muninn-memoryd lifecycle all
+Nice=15

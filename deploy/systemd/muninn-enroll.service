@@ -1,0 +1,8 @@
+[Unit]
+Description=Enroll new repo mirrors in Muninn (install the push hook and index HEAD)
+After=muninn-indexd.service
+
+[Service]
+Type=oneshot
+Environment=MUNINN_BACKFILL_MISSING=1
+ExecStart=/bin/sh %h/.local/share/muninn/backfill.sh
