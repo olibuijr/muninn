@@ -7,8 +7,15 @@ async fn main() {
         tokens: std::env::var("MUNINN_TOKENS_FILE")
             .map(|p| muninn_core::auth::Tokens::load(&p).expect("tokens"))
             .unwrap_or_default(),
-        token: std::env::var("MUNINN_MCP_TOKEN").ok(),
+        token: std::env::var("MUNINN_MCP_TOKEN")
+            .ok()
+            .filter(|t| !t.is_empty()),
+        anonymous: std::env::var("MUNINN_MCP_ANONYMOUS").is_ok_and(|v| v == "1"),
     };
+    if let Err(e) = cfg.check() {
+        eprintln!("{e}");
+        std::process::exit(1);
+    }
     let bind = std::env::var("MUNINN_MCP_BIND").unwrap_or("127.0.0.1:7411".into());
     let l = tokio::net::TcpListener::bind(&bind).await.unwrap();
     eprintln!("{{\"event\":\"listening\",\"addr\":\"{bind}\"}}");

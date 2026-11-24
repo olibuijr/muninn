@@ -13,6 +13,23 @@ pub struct Cfg {
     pub memoryd: String,
     pub token: Option<String>,
     pub tokens: Tokens,
+    /// MUNINN_MCP_ANONYMOUS=1: serve index:read to callers without a token when neither a tokens
+    /// file nor MUNINN_MCP_TOKEN is set. Off by default; without it mcp refuses to start.
+    pub anonymous: bool,
+}
+
+impl Cfg {
+    /// Refuses a configuration that would serve unauthenticated callers by accident.
+    pub fn check(&self) -> Result<(), String> {
+        if self.tokens.0.is_empty() && self.token.is_none() && !self.anonymous {
+            return Err(
+                "muninn-mcp: no MUNINN_TOKENS_FILE entries and no MUNINN_MCP_TOKEN; set one, \
+                 or MUNINN_MCP_ANONYMOUS=1 to serve the index tools without authentication"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
 }
 
 use muninn_core::{auth::Tokens, memory::Ctx};
@@ -692,6 +709,30 @@ pub fn handle(cfg: &Cfg, ctx: &Ctx, auth: &str, req: &Value) -> Option<Value> {
     }
 }
 
+/// The caller of one request: a tokens-file identity, the legacy MUNINN_MCP_TOKEN (index:read) or,
+/// only with MUNINN_MCP_ANONYMOUS=1, an anonymous index:read caller.
+pub fn resolve_ctx(cfg: &Cfg, auth: &str, run: Option<String>) -> Option<Ctx> {
+    if !cfg.tokens.0.is_empty() {
+        cfg.tokens.resolve(Some(auth), run)
+    } else if let Some(t) = &cfg.token {
+        (auth == format!("Bearer {t}")).then(|| Ctx {
+            actor: "legacy".into(),
+            scopes: vec!["index:read".into()],
+            projects: vec![],
+            run_id: run,
+        })
+    } else if cfg.anonymous {
+        Some(Ctx {
+            actor: "anonymous".into(),
+            scopes: vec!["index:read".into()],
+            projects: vec![],
+            run_id: run,
+        })
+    } else {
+        None
+    }
+}
+
 async fn mcp(
     State(cfg): State<Arc<Cfg>>,
     h: HeaderMap,
@@ -706,23 +747,7 @@ async fn mcp(
         .get("x-muninn-run-id")
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let ctx = if !cfg.tokens.0.is_empty() {
-        cfg.tokens.resolve(Some(&auth), run)
-    } else if let Some(t) = &cfg.token {
-        (auth == format!("Bearer {t}")).then(|| Ctx {
-            actor: "legacy".into(),
-            scopes: vec!["index:read".into()],
-            projects: vec![],
-            run_id: run,
-        })
-    } else {
-        Some(Ctx {
-            actor: "anonymous".into(),
-            scopes: vec!["index:read".into()],
-            projects: vec![],
-            run_id: run,
-        })
-    };
+    let ctx = resolve_ctx(&cfg, &auth, run);
     let Some(ctx) = ctx else {
         return (
             StatusCode::UNAUTHORIZED,
@@ -764,6 +789,42 @@ mod tests {
         assert!(number_lines("a\nb\nc\n", Some(3), Some(2)).is_err());
         assert_eq!(number_lines("", None, None).unwrap().3, 0);
         assert_eq!(number_lines("a\nb\n", Some(1), Some(99)).unwrap().2, 2);
+    }
+
+    fn cfg(tokens: bool, token: bool, anonymous: bool) -> super::Cfg {
+        let entry = muninn_core::auth::TokenEntry {
+            sha256: "00".into(),
+            actor: "a".into(),
+            scopes: vec![],
+            projects: vec![],
+        };
+        super::Cfg {
+            indexd: String::new(),
+            memoryd: String::new(),
+            token: token.then(|| "t".into()),
+            tokens: muninn_core::auth::Tokens(if tokens { vec![entry] } else { vec![] }),
+            anonymous,
+        }
+    }
+
+    #[test]
+    fn refuses_to_start_open_without_opt_in() {
+        assert!(cfg(false, false, false).check().is_err());
+        assert!(cfg(false, false, true).check().is_ok());
+        assert!(cfg(true, false, false).check().is_ok());
+        assert!(cfg(false, true, false).check().is_ok());
+    }
+
+    #[test]
+    fn anonymous_callers_need_the_opt_in() {
+        assert!(super::resolve_ctx(&cfg(false, false, false), "", None).is_none());
+        let c = super::resolve_ctx(&cfg(false, false, true), "", None).unwrap();
+        assert_eq!(
+            (c.actor.as_str(), c.scopes.as_slice()),
+            ("anonymous", &["index:read".to_string()][..])
+        );
+        assert!(super::resolve_ctx(&cfg(false, true, true), "", None).is_none());
+        assert!(super::resolve_ctx(&cfg(false, true, false), "Bearer t", None).is_some());
     }
 
     #[test]

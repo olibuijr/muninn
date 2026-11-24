@@ -7,7 +7,7 @@ and the units below in `~/.config/systemd/user`. Settings live in `~/.config/mun
 | Unit | Default bind | Notes |
 |---|---|---|
 | `muninn-indexd` | 127.0.0.1:7410 | needs `MUNINN_PG_URL`, `MUNINN_INDEXD_TOKEN`, `MUNINN_WEBHOOK_SECRET`, model URLs |
-| `muninn-mcp` | 127.0.0.1:7411 | `/mcp` (streamable HTTP); tokens from `MUNINN_TOKENS_FILE` |
+| `muninn-mcp` | 127.0.0.1:7411 | `/mcp` (streamable HTTP); needs `MUNINN_TOKENS_FILE` (or `MUNINN_MCP_TOKEN`) |
 | `muninn-memoryd` | 127.0.0.1:7412 | same tokens file |
 | `muninn-indexweb` | 0.0.0.0:7415 | `MUNINN_INDEXWEB_TOKEN` (16+ chars) in `indexweb.env`; LAN only |
 | `muninn-watch` | - | `MUNINN_WATCH=repo=/checkout,...` |
@@ -30,8 +30,8 @@ To serve other machines, set the binds to a LAN address or put a TLS reverse pro
 - `memory:write`: remember. `memory:forget`: forget your own facts and decide review items.
 
 memoryd and mcp read the file at start: restart them after adding a token. Without the file, mcp falls back to a single
-`MUNINN_MCP_TOKEN` with `index:read` only (no memory tools); with neither, mcp serves the index
-tools to anyone who can reach it.
+`MUNINN_MCP_TOKEN` with `index:read` only (no memory tools); with neither, mcp refuses to start
+unless `MUNINN_MCP_ANONYMOUS=1` is set, which serves the index tools to anyone who can reach it.
 
 ## Reindex
 

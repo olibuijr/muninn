@@ -8,6 +8,8 @@
   values that are not object ids, so they can no longer reach git as paths or options.
 - Memory recall honours `project_id` (`muninn recall --project P`, memoryd `/recall`, the MCP
   `recall` tool): only memories stored with that project are returned.
+- `muninn-mcp` refuses to start without a tokens file or `MUNINN_MCP_TOKEN` instead of serving
+  the index tools to anyone; `MUNINN_MCP_ANONYMOUS=1` keeps the old open behaviour on purpose.
 
 ## [0.1.0] - 2026-11-24
 
