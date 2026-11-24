@@ -49,8 +49,13 @@ impl Reranker for CountingRr {
     }
 }
 
+/// The tests share one database; the first MemStore::connect on a fresh one creates roles and
+/// policies, which races when two tests connect at once.
+static SERIAL: Mutex<()> = Mutex::new(());
+
 #[test]
 fn recall_reranks_up_to_twenty_candidates() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let Ok(url) = std::env::var("MUNINN_TEST_PG_URL") else {
         return;
     };
@@ -124,6 +129,7 @@ impl Reranker for FixedRr {
 /// reranker's scale (0.25 x weights), not the normalised RRF 1.0 the agree shortcut used to give.
 #[test]
 fn recall_reranks_when_dense_and_fts_agree() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     const SCHEMA: &str = "recall_agree_test";
     let Ok(url) = std::env::var("MUNINN_TEST_PG_URL") else {
         return;
