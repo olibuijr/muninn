@@ -19,6 +19,10 @@
 - `client.sh` no longer prints a stray blank line when the token comes from `MUNINN_TOKEN`.
 - `client.sh` installs the `muninn hook prompt|pre|post` hooks for Codex too (`~/.codex/hooks.json`,
   merged with existing entries), as the docs already said; before, only Claude Code got them.
+- `muninn-indexd` finds rust-analyzer like `muninn-scip` (`MUNINN_RUST_ANALYZER`, `rustup which`,
+  PATH), runs each SCIP indexer in its own memory-capped systemd scope, logs one `symbols_skipped`
+  line instead of a failure per push when an indexer is missing, and leaves `MUNINN_SCIP_REPOS` to
+  the muninn-scip timer.
 
 ## [0.1.0] - 2026-11-24
 

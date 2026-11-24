@@ -51,8 +51,15 @@ unless `MUNINN_MCP_ANONYMOUS=1` is set, which serves the index tools to anyone w
 
 ## Symbols (SCIP)
 
-indexd can run `rust-analyzer scip` and `scip-typescript` itself after a push, inside its own 1 GB
-cgroup. Large Rust workspaces need several GB, so run those with `muninn-scip` instead:
+indexd can run `rust-analyzer scip` and `scip-typescript` itself after a push to main/master
+(`MUNINN_SCIP=0` turns that off). It finds rust-analyzer through `MUNINN_RUST_ANALYZER`, else
+`rustup which --toolchain $MUNINN_SCIP_TOOLCHAIN rust-analyzer` (rustup from PATH or
+`~/.cargo/bin`), else PATH, and scip-typescript
+through `MUNINN_SCIP_TYPESCRIPT` or PATH; a repo whose indexer is missing is skipped with one
+`symbols_skipped` log line. Each run gets its own `systemd-run --user --scope` (limits
+`MUNINN_INDEXD_SCIP_MEM_HIGH`/`_MAX`, default 1536M/2G; `MUNINN_SCIP_SCOPE=0` disables it) so an OOM
+kill never takes indexd down. Repos in `MUNINN_SCIP_REPOS` are left to the timer below. Large Rust
+workspaces need several GB, so run those with `muninn-scip` instead:
 
 ```sh
 muninn-scip run --repo api                      # git archive, scip per project, load into Postgres

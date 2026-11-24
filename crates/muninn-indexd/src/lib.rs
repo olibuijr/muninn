@@ -809,13 +809,16 @@ async fn webhook(
             && std::env::var("MUNINN_SCIP").as_deref() != Ok("0")
         {
             let (a3, r3, b3) = (a2.clone(), repo.clone(), branch.clone());
-            std::thread::spawn(move || {
-                if let Err(e) = symbols::index_repo(&a3, &r3, &b3) {
-                    eprintln!(
-                        "{{\"event\":\"symbols_reindex_failed\",\"repo\":\"{r3}\",\"error\":{}}}",
-                        json!(e)
-                    );
+            std::thread::spawn(move || match symbols::index_repo(&a3, &r3, &b3) {
+                Ok(v) => {
+                    if let Some(why) = v["skipped"].as_str() {
+                        symbols::log_skip_once(&r3, why);
+                    }
                 }
+                Err(e) => eprintln!(
+                    "{{\"event\":\"symbols_reindex_failed\",\"repo\":\"{r3}\",\"error\":{}}}",
+                    json!(e)
+                ),
             });
         }
         n

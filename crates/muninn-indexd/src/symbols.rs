@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
     sync::{Arc, Mutex, OnceLock},
 };
 
@@ -27,24 +27,174 @@ fn work_dir(app: &App) -> PathBuf {
         .unwrap_or_else(|_| app.repos_dir.join("..").join("scip-work"))
 }
 
-fn run(dir: &Path, prog: &str, args: &[&str]) -> Result<(), String> {
-    let out = Command::new("nice")
-        .args(["-n", "19", prog])
-        .args(args)
+/// Where an indexer binary comes from: an explicit setting, then (rust-analyzer only) the pinned
+/// toolchain via `rustup which`, then PATH. None: the tool is not installed.
+pub fn resolve_tool(
+    setting: Option<String>,
+    rustup: impl FnOnce() -> Option<PathBuf>,
+    on_path: impl FnOnce() -> Option<PathBuf>,
+) -> Option<PathBuf> {
+    setting
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(rustup)
+        .or_else(on_path)
+}
+
+/// First executable file called `name` in PATH.
+fn which(name: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|d| d.join(name))
+        .find(|p| {
+            p.metadata()
+                .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        })
+}
+
+fn toolchain() -> String {
+    std::env::var("MUNINN_SCIP_TOOLCHAIN").unwrap_or_else(|_| "1.98.1".into())
+}
+
+/// rust-analyzer: MUNINN_RUST_ANALYZER, else `rustup which --toolchain T rust-analyzer` (the
+/// pinned toolchain's binary; rust-analyzer is often not on PATH), else PATH. Same idea as muninn-scip.
+fn rust_analyzer() -> Option<PathBuf> {
+    resolve_tool(
+        std::env::var("MUNINN_RUST_ANALYZER").ok(),
+        || {
+            // A systemd user service usually lacks ~/.cargo/bin on PATH, where rustup lives.
+            let cargo_home = std::env::var_os("CARGO_HOME")
+                .map(PathBuf::from)
+                .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cargo")));
+            let rustup = which("rustup").or_else(|| {
+                cargo_home
+                    .map(|c| c.join("bin/rustup"))
+                    .filter(|p| p.is_file())
+            })?;
+            let o = Command::new(rustup)
+                .args(["which", "--toolchain", &toolchain(), "rust-analyzer"])
+                .stderr(Stdio::null())
+                .output()
+                .ok()?;
+            let p = PathBuf::from(String::from_utf8(o.stdout).ok()?.trim());
+            (o.status.success() && p.is_file()).then_some(p)
+        },
+        || which("rust-analyzer"),
+    )
+}
+
+/// scip-typescript: MUNINN_SCIP_TYPESCRIPT, else PATH.
+fn scip_typescript() -> Option<PathBuf> {
+    resolve_tool(
+        std::env::var("MUNINN_SCIP_TYPESCRIPT").ok(),
+        || None,
+        || which("scip-typescript"),
+    )
+}
+
+/// Repos whose symbols the muninn-scip timer builds (MUNINN_SCIP_REPOS, space or comma separated);
+/// indexd leaves them alone because they are too big for its cgroup.
+pub fn scip_timer_repos(list: &str) -> Vec<&str> {
+    list.split([' ', ',', '\t', '\n'])
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// Memory limits of the transient scope each indexer runs in.
+pub struct Scope {
+    pub high: String,
+    pub max: String,
+}
+
+/// A transient systemd scope per indexer run, so an OOM kill hits that scope and never indexd
+/// (whose own cgroup is 1 GB). Used when `systemd-run --user --scope` works here; MUNINN_SCIP_SCOPE=0
+/// turns it off. Limits: MUNINN_INDEXD_SCIP_MEM_HIGH / MUNINN_INDEXD_SCIP_MEM_MAX (default 1536M / 2G).
+fn scope() -> Option<&'static Scope> {
+    static S: OnceLock<Option<Scope>> = OnceLock::new();
+    S.get_or_init(|| {
+        if std::env::var("MUNINN_SCIP_SCOPE").as_deref() == Ok("0") {
+            return None;
+        }
+        let ok = Command::new("systemd-run")
+            .args(["--user", "--scope", "--quiet", "--collect", "true"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        let env = |k: &str, d: &str| {
+            std::env::var(k)
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| d.into())
+        };
+        ok.then(|| Scope {
+            high: env("MUNINN_INDEXD_SCIP_MEM_HIGH", "1536M"),
+            max: env("MUNINN_INDEXD_SCIP_MEM_MAX", "2G"),
+        })
+    })
+    .as_ref()
+}
+
+/// `nice -n 19 prog args`, wrapped in `systemd-run --user --scope` with memory limits when `scope`
+/// is given. The unit name is made of `unit` with characters systemd rejects replaced.
+pub fn tool_command(scope: Option<&Scope>, unit: &str, prog: &Path, args: &[&str]) -> Command {
+    let mut c = match scope {
+        Some(s) => {
+            let unit: String = unit
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || "-_.:".contains(c) {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
+                .collect();
+            let mut c = Command::new("systemd-run");
+            c.args([
+                "--user",
+                "--scope",
+                "--quiet",
+                "--collect",
+                "--slice=background.slice",
+            ])
+            .arg(format!("--unit={unit}"))
+            .arg("-p")
+            .arg(format!("MemoryHigh={}", s.high))
+            .arg("-p")
+            .arg(format!("MemoryMax={}", s.max))
+            .args(["-p", "MemorySwapMax=1G", "-p", "CPUWeight=20", "nice"]);
+            c
+        }
+        None => Command::new("nice"),
+    };
+    c.args(["-n", "19"]).arg(prog).args(args);
+    c
+}
+
+fn run(dir: &Path, unit: &str, prog: &Path, args: &[&str]) -> Result<(), String> {
+    let mut c = tool_command(scope(), unit, prog, args);
+    // The toolchain's own cargo/rustc first, so rust-analyzer works without ~/.cargo/bin on PATH.
+    if let Some(bin) = prog.parent().filter(|b| !b.as_os_str().is_empty()) {
+        let path = std::env::var("PATH").unwrap_or_default();
+        c.env("PATH", format!("{}:{path}", bin.display()));
+    }
+    let name = prog.file_name().unwrap_or_default().to_string_lossy();
+    let out = c
         .current_dir(dir)
         .env("CARGO_BUILD_JOBS", "4")
-        .env(
-            "RUSTUP_TOOLCHAIN",
-            std::env::var("MUNINN_SCIP_TOOLCHAIN").unwrap_or_else(|_| "1.98.1".into()),
-        )
+        .env("RUSTUP_TOOLCHAIN", toolchain())
+        .stdin(Stdio::null())
         .output()
-        .map_err(|e| format!("{prog}: {e}"))?;
+        .map_err(|e| format!("{name}: {e}"))?;
     if out.status.success() {
         Ok(())
     } else {
         let err = String::from_utf8_lossy(&out.stderr);
         Err(format!(
-            "{prog} failed: {}",
+            "{name} failed ({}): {}",
+            out.status,
             err.lines()
                 .find(|l| l.contains("error"))
                 .or(err.lines().last())
@@ -127,8 +277,33 @@ fn sibling_repos(root: &Path, repo: &str) -> Vec<String> {
     out
 }
 
+/// Logs `symbols_skipped` (info) the first time a repo is skipped for a given reason in this
+/// process, so a missing tool does not log on every push.
+pub fn log_skip_once(repo: &str, reason: &str) {
+    static SEEN: OnceLock<Mutex<HashSet<(String, String)>>> = OnceLock::new();
+    let first = SEEN
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .insert((repo.to_string(), reason.to_string()));
+    if first {
+        eprintln!(
+            "{}",
+            json!({"event": "symbols_skipped", "level": "info", "repo": repo, "reason": reason})
+        );
+    }
+}
+
+/// Builds the repo's symbol graph in-daemon. Returns `{"skipped": reason}` without touching the
+/// stored symbols when the repo belongs to the muninn-scip timer or no indexer it needs is installed.
 pub fn index_repo(app: &App, repo: &str, branch: &str) -> Result<Value, String> {
     let store = app.store.as_ref().ok_or("no store")?;
+    let timer = std::env::var("MUNINN_SCIP_REPOS").unwrap_or_default();
+    if scip_timer_repos(&timer).contains(&repo) {
+        return Ok(
+            json!({"repo": repo, "skipped": "built by the muninn-scip timer (MUNINN_SCIP_REPOS)"}),
+        );
+    }
     if !running().lock().unwrap().insert(repo.to_string()) {
         return Err("symbol indexing already running for this repo".into());
     }
@@ -220,7 +395,28 @@ fn index_repo_inner(
     for p in projects(&root, "tsconfig.json") {
         jobs.push((p, "scip-typescript", "tsconfig.json".into()));
     }
+    static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let (mut ra, mut ts) = (None, None);
     for (prefix, tool, _) in &jobs {
+        let prog = match *tool {
+            "rust-analyzer" => ra.get_or_insert_with(rust_analyzer).clone(),
+            _ => ts.get_or_insert_with(scip_typescript).clone(),
+        };
+        let Some(prog) = prog else {
+            let hint = if *tool == "rust-analyzer" {
+                "MUNINN_RUST_ANALYZER"
+            } else {
+                "MUNINN_SCIP_TYPESCRIPT"
+            };
+            log.push(json!({"tool": tool, "project": prefix,
+                "skipped": format!("{tool} not found (set {hint} or put it on PATH)")}));
+            continue;
+        };
+        let unit = format!(
+            "muninn-indexd-scip-{repo}-{}-{}",
+            std::process::id(),
+            RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
         let dir = root.join(prefix);
         let out = root.join(format!(
             ".scip-{}.scip",
@@ -228,8 +424,8 @@ fn index_repo_inner(
         ));
         let out_s = out.to_string_lossy().to_string();
         let r = match *tool {
-            "rust-analyzer" => run(&dir, "rust-analyzer", &["scip", ".", "--output", &out_s]),
-            _ => run(&dir, "scip-typescript", &["index", "--output", &out_s]),
+            "rust-analyzer" => run(&dir, &unit, &prog, &["scip", ".", "--output", &out_s]),
+            _ => run(&dir, &unit, &prog, &["index", "--output", &out_s]),
         };
         let entry = match r
             .and_then(|_| std::fs::read(&out).map_err(|e| e.to_string()))
@@ -252,8 +448,13 @@ fn index_repo_inner(
     for d in extracted {
         let _ = std::fs::remove_dir_all(d);
     }
-    if g.defs.is_empty() && log.iter().all(|l| l.get("error").is_some()) && !log.is_empty() {
-        return Err(format!("all indexers failed: {log:?}"));
+    let ran = |l: &&Value| l.get("error").is_none() && l.get("skipped").is_none();
+    if !log.is_empty() && !log.iter().any(|l| ran(&l)) {
+        if log.iter().any(|l| l.get("error").is_some()) {
+            return Err(format!("all indexers failed: {log:?}"));
+        }
+        let reasons: Vec<&str> = log.iter().filter_map(|l| l["skipped"].as_str()).collect();
+        return Ok(json!({"repo": repo, "skipped": reasons.join("; ")}));
     }
     store
         .replace_symbols(repo, &sha, &g)
@@ -455,4 +656,74 @@ pub async fn for_hits(State(app): State<Arc<App>>, Json(b): Json<FH>) -> Json<Va
     })
     .await
     .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Scope, resolve_tool, scip_timer_repos, tool_command};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn tool_resolution_order() {
+        let p = |s: &str| Some(PathBuf::from(s));
+        assert_eq!(
+            resolve_tool(Some("/set".into()), || p("/rustup"), || p("/path")),
+            p("/set")
+        );
+        assert_eq!(
+            resolve_tool(Some(String::new()), || p("/rustup"), || p("/path")),
+            p("/rustup")
+        );
+        assert_eq!(resolve_tool(None, || None, || p("/path")), p("/path"));
+        assert_eq!(resolve_tool(None, || None, || None), None);
+    }
+
+    #[test]
+    fn timer_repos_are_space_or_comma_separated() {
+        assert_eq!(
+            scip_timer_repos(" big, other  third\n"),
+            ["big", "other", "third"]
+        );
+        assert!(scip_timer_repos("").is_empty());
+        assert!(!scip_timer_repos("bigger").contains(&"big"));
+    }
+
+    #[test]
+    fn indexer_runs_in_its_own_scope_when_available() {
+        let args = |c: &std::process::Command| -> Vec<String> {
+            std::iter::once(c.get_program())
+                .chain(c.get_args())
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        let ra = Path::new("/tc/bin/rust-analyzer");
+        let plain = tool_command(None, "u", ra, &["scip", "."]);
+        assert_eq!(
+            args(&plain),
+            ["nice", "-n", "19", "/tc/bin/rust-analyzer", "scip", "."]
+        );
+        let s = Scope {
+            high: "1536M".into(),
+            max: "2G".into(),
+        };
+        let scoped = args(&tool_command(
+            Some(&s),
+            "muninn-indexd-scip-a b/c",
+            ra,
+            &["scip"],
+        ));
+        assert_eq!(scoped[0], "systemd-run");
+        for want in [
+            "--scope",
+            "--unit=muninn-indexd-scip-a_b_c",
+            "MemoryHigh=1536M",
+            "MemoryMax=2G",
+        ] {
+            assert!(scoped.iter().any(|a| a == want), "{want} in {scoped:?}");
+        }
+        assert_eq!(
+            scoped[scoped.len() - 5..],
+            ["nice", "-n", "19", "/tc/bin/rust-analyzer", "scip"]
+        );
+    }
 }
