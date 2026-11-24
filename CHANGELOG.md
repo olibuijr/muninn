@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `muninn hook prompt` drops recalled memories that score below 0.6 of the best hit
+  (`MUNINN_HOOK_REL_SCORE`), so one strong match no longer brings four weak ones into the prompt.
+
 ## [0.1.0] - 2026-11-24
 
 First public release.

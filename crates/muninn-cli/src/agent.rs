@@ -521,6 +521,18 @@ fn emit(event: &str, fields: Value) {
     println!("{}", json!({"hookSpecificOutput": o}));
 }
 
+/// Default for `MUNINN_HOOK_REL_SCORE`: the prompt hook drops hits scoring below this fraction of
+/// the best hit, so one strong match does not bring four weak ones along.
+const HOOK_REL_SCORE: f64 = 0.6;
+
+/// Recall hits the prompt hook injects: at least `min`, and at least `rel` times the top score.
+fn prompt_hits(hits: &[Value], min: f64, rel: f64) -> Vec<&Value> {
+    let score = |h: &Value| h["score"].as_f64().unwrap_or(0.0);
+    let top = hits.iter().map(score).fold(0.0, f64::max);
+    let floor = min.max(top * rel);
+    hits.iter().filter(|h| score(h) >= floor).collect()
+}
+
 /// `muninn hook prompt|pre|post` with the hook event on stdin. Fails open: errors go to stderr
 /// and the tool call or prompt goes through.
 fn hook(kind: &str) {
@@ -580,13 +592,14 @@ fn hook(kind: &str) {
             let min = env("MUNINN_HOOK_MIN_SCORE")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0.3);
+            let rel = env("MUNINN_HOOK_REL_SCORE")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(HOOK_REL_SCORE);
             match mem_post("recall", &json!({"query": q, "k": 5}), 8) {
                 Ok(v) => {
-                    let lines: Vec<String> = v["hits"]
-                        .as_array()
+                    let hits = v["hits"].as_array().map(Vec::as_slice).unwrap_or(&[]);
+                    let lines: Vec<String> = prompt_hits(hits, min, rel)
                         .into_iter()
-                        .flatten()
-                        .filter(|h| h["score"].as_f64().unwrap_or(0.0) >= min)
                         .map(|h| {
                             format!(
                                 "- [{}] {} (src: {}, id {})",
@@ -660,6 +673,24 @@ mod tests {
             );
         }
         assert!(SKILL.lines().count() < 500);
+    }
+
+    #[test]
+    fn prompt_hook_drops_hits_far_below_the_best() {
+        let hits: Vec<Value> = [0.92, 0.45, 0.45, 0.44, 0.43]
+            .iter()
+            .map(|s| json!({"score": s}))
+            .collect();
+        let kept = |min, rel| prompt_hits(&hits, min, rel).len();
+        assert_eq!(kept(0.3, HOOK_REL_SCORE), 1);
+        assert_eq!(kept(0.3, 0.0), 5);
+        assert_eq!(kept(0.95, 0.0), 0);
+        let close: Vec<Value> = [0.8, 0.7, 0.2]
+            .iter()
+            .map(|s| json!({"score": s}))
+            .collect();
+        assert_eq!(prompt_hits(&close, 0.3, HOOK_REL_SCORE).len(), 2);
+        assert!(prompt_hits(&[], 0.3, HOOK_REL_SCORE).is_empty());
     }
 
     #[test]

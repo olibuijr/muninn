@@ -26,7 +26,8 @@ const USAGE: &str = "usage: muninn <command> [--json]
 env: MUNINN_INDEXD_URL (default http://127.0.0.1:7410), MUNINN_INDEXD_TOKEN or ~/.config/muninn/indexd-token;
      MUNINN_MEMORYD_URL (default http://127.0.0.1:7412), MUNINN_TOKEN, MUNINN_TOKEN_CMD or ~/.config/muninn/token;
      settings also come from ~/.config/muninn/client.env (KEY=VALUE);
-     hooks: MUNINN_HOOK_REPOS (comma-separated paths, trailing * allowed), MUNINN_MCP_NAME (muninn);
+     hooks: MUNINN_HOOK_REPOS (comma-separated paths, trailing * allowed), MUNINN_MCP_NAME (muninn),
+       MUNINN_HOOK_MIN_SCORE (0.3) and MUNINN_HOOK_REL_SCORE (0.6, fraction of the best hit);
      expand llm: MUNINN_CHAT_URL or MUNINN_EMBED_URL, MUNINN_CHAT_MODEL, MUNINN_LLAMA_API_KEY,
      MUNINN_EXPAND_TIMEOUT_MS";
 
