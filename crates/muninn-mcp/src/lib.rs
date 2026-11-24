@@ -715,12 +715,14 @@ pub fn resolve_ctx(cfg: &Cfg, auth: &str, run: Option<String>) -> Option<Ctx> {
     if !cfg.tokens.0.is_empty() {
         cfg.tokens.resolve(Some(auth), run)
     } else if let Some(t) = &cfg.token {
-        (auth == format!("Bearer {t}")).then(|| Ctx {
-            actor: "legacy".into(),
-            scopes: vec!["index:read".into()],
-            projects: vec![],
-            run_id: run,
-        })
+        auth.strip_prefix("Bearer ")
+            .is_some_and(|g| muninn_core::auth::token_matches(g, t))
+            .then(|| Ctx {
+                actor: "legacy".into(),
+                scopes: vec!["index:read".into()],
+                projects: vec![],
+                run_id: run,
+            })
     } else if cfg.anonymous {
         Some(Ctx {
             actor: "anonymous".into(),
@@ -825,6 +827,8 @@ mod tests {
         );
         assert!(super::resolve_ctx(&cfg(false, true, true), "", None).is_none());
         assert!(super::resolve_ctx(&cfg(false, true, false), "Bearer t", None).is_some());
+        assert!(super::resolve_ctx(&cfg(false, true, false), "Bearer u", None).is_none());
+        assert!(super::resolve_ctx(&cfg(false, true, false), "t", None).is_none());
     }
 
     #[test]

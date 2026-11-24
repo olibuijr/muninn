@@ -10,6 +10,7 @@
   `recall` tool): only memories stored with that project are returned.
 - `muninn-mcp` refuses to start without a tokens file or `MUNINN_MCP_TOKEN` instead of serving
   the index tools to anyone; `MUNINN_MCP_ANONYMOUS=1` keeps the old open behaviour on purpose.
+- `muninn-mcp` compares `MUNINN_MCP_TOKEN` in constant time.
 
 ## [0.1.0] - 2026-11-24
 

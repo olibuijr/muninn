@@ -2,6 +2,16 @@ use crate::memory::Ctx;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+/// Constant-time comparison of a presented secret with the expected one (length is not hidden).
+pub fn token_matches(given: &str, expected: &str) -> bool {
+    given.len() == expected.len()
+        && given
+            .bytes()
+            .zip(expected.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
+}
+
 #[derive(Deserialize, Clone)]
 pub struct TokenEntry {
     pub sha256: String,
@@ -36,5 +46,18 @@ impl Tokens {
         let tok = header?.strip_prefix("Bearer ")?;
         let h = hex::encode(Sha256::digest(tok.as_bytes()));
         self.0.iter().find(|t| t.sha256 == h).map(|t| t.ctx(run_id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::token_matches;
+
+    #[test]
+    fn token_compare() {
+        assert!(token_matches("abcdefghijklmnop", "abcdefghijklmnop"));
+        assert!(!token_matches("abcdefghijklmnoq", "abcdefghijklmnop"));
+        assert!(!token_matches("short", "abcdefghijklmnop"));
+        assert!(!token_matches("", "abcdefghijklmnop"));
     }
 }
