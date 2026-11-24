@@ -29,7 +29,10 @@ async fn main() {
 fn setup() -> (std::sync::Arc<App>, String) {
     let dir = std::env::var("MUNINN_REPOS_DIR")
         .expect("MUNINN_REPOS_DIR (bare/mirror clones, one dir per repo)");
-    let secret = std::env::var("MUNINN_WEBHOOK_SECRET").ok();
+    let secret = std::env::var("MUNINN_WEBHOOK_SECRET")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .expect("MUNINN_WEBHOOK_SECRET (HMAC key for /webhook/push; generate with openssl rand -hex 32)");
     let bind = std::env::var("MUNINN_INDEXD_BIND").unwrap_or_else(|_| "127.0.0.1:7410".into());
     let store = std::env::var("MUNINN_PG_URL")
         .ok()
@@ -40,7 +43,7 @@ fn setup() -> (std::sync::Arc<App>, String) {
     let rr = std::env::var("MUNINN_RERANK_URL")
         .ok()
         .map(|url| Box::new(muninn_core::HttpReranker { url }) as Box<dyn muninn_core::Reranker>);
-    let app = App::with_backends(dir.into(), secret, store, emb, rr);
+    let app = App::with_backends(dir.into(), Some(secret), store, emb, rr);
     if let Ok(list) = std::env::var("MUNINN_INITIAL") {
         for spec in list.split(',').filter(|s| !s.is_empty()) {
             let (repo, branch) = spec.split_once('@').unwrap_or((spec, "main"));

@@ -743,18 +743,23 @@ async fn webhook(
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64;
-    if let Some(sec) = &app.secret {
-        let sig = h
-            .get("x-gitea-signature")
-            .or_else(|| h.get("x-hub-signature-256"))
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        if !verify(sec, &body, sig) {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "bad signature"})),
-            );
-        }
+    // Fail closed: the route skips the bearer, so the HMAC is its only authentication.
+    let Some(sec) = app.secret.as_deref().filter(|s| !s.is_empty()) else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": "MUNINN_WEBHOOK_SECRET is not set"})),
+        );
+    };
+    let sig = h
+        .get("x-gitea-signature")
+        .or_else(|| h.get("x-hub-signature-256"))
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !verify(sec, &body, sig) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "bad signature"})),
+        );
     }
     let v: Value = match serde_json::from_slice(&body) {
         Ok(v) => v,

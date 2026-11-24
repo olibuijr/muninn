@@ -6,7 +6,7 @@ and the units below in `~/.config/systemd/user`. Settings live in `~/.config/mun
 
 | Unit | Default bind | Notes |
 |---|---|---|
-| `muninn-indexd` | 127.0.0.1:7410 | needs `MUNINN_PG_URL`, `MUNINN_INDEXD_TOKEN`, `MUNINN_WEBHOOK_SECRET`, model URLs |
+| `muninn-indexd` | 127.0.0.1:7410 | needs `MUNINN_PG_URL`, model URLs; refuses to start without `MUNINN_INDEXD_TOKEN` and `MUNINN_WEBHOOK_SECRET` |
 | `muninn-mcp` | 127.0.0.1:7411 | `/mcp` (streamable HTTP); needs `MUNINN_TOKENS_FILE` (or `MUNINN_MCP_TOKEN`) |
 | `muninn-memoryd` | 127.0.0.1:7412 | same tokens file |
 | `muninn-indexweb` | 0.0.0.0:7415 | `MUNINN_INDEXWEB_TOKEN` (16+ chars) in `indexweb.env`; LAN only |
