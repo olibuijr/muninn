@@ -16,6 +16,7 @@
 - Memory recall always reranks its candidate window, so scores are on the reranker's scale even
   when dense and full-text search agree on the top hit and the prompt hook's
   `MUNINN_HOOK_MIN_SCORE` / `MUNINN_HOOK_REL_SCORE` mean the same thing for every prompt.
+- `client.sh` no longer prints a stray blank line when the token comes from `MUNINN_TOKEN`.
 
 ## [0.1.0] - 2026-11-24
 

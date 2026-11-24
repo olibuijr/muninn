@@ -12,7 +12,7 @@ command -v muninn >/dev/null || { echo "install the muninn binary into PATH firs
 mkdir -p ~/.config/muninn && chmod 700 ~/.config/muninn
 if [[ ! -s ~/.config/muninn/token ]]; then
   tok=${MUNINN_TOKEN:-}
-  [[ -n $tok ]] || read -rsp "Muninn token for this machine: " tok && echo
+  if [[ -z $tok ]]; then read -rsp "Muninn token for this machine: " tok; echo; fi
   (umask 077 && printf '%s\n' "$tok" > ~/.config/muninn/token)
 fi
 cat > ~/.config/muninn/client.env <<EOF
