@@ -3,7 +3,7 @@
 # Muninn
 
 [![CI](https://github.com/olibuijr/muninn/actions/workflows/ci.yml/badge.svg)](https://github.com/olibuijr/muninn/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-b45309)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.1-b45309)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **A self-hosted code index and shared memory for AI coding agents.**

@@ -740,7 +740,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "muninn-core",
  "serde_json",
@@ -750,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "hex",
  "postgres",
@@ -777,7 +777,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-indexd"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "hex",
@@ -792,7 +792,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-indexweb"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "tokio",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-mcp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "muninn-core",
@@ -813,7 +813,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-memoryd"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "muninn-core",
@@ -824,7 +824,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-scip"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "muninn-core",
  "serde_json",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-watch"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde_json",
  "ureq",
