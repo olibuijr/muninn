@@ -61,6 +61,7 @@ such as two `llama-server` processes.
 curl -LO https://github.com/olibuijr/muninn/releases/latest/download/muninn-x86_64-linux.tar.gz
 tar xzf muninn-x86_64-linux.tar.gz && cd muninn-x86_64-linux
 mkdir -p ~/.config/muninn && cp index.env.example ~/.config/muninn/index.env   # fill it in, mode 0600
+# create tokens.json (below) and the database first, then:
 ./install.sh                                      # binaries, systemd user units, start
 ```
 

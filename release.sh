@@ -44,7 +44,8 @@ notes() {
 \`\`\`sh
 curl -LO https://github.com/olibuijr/muninn/releases/latest/download/$name.tar.gz
 tar xzf $name.tar.gz && cd $name
-mkdir -p ~/.config/muninn && cp index.env.example ~/.config/muninn/index.env   # fill it in, then:
+mkdir -p ~/.config/muninn && cp index.env.example ~/.config/muninn/index.env   # fill it in
+# create ~/.config/muninn/tokens.json (README.md, Tokens and scopes), then:
 ./install.sh                                      # the services, as systemd user units
 MUNINN_HOST=http://SERVER ./client.sh             # each machine with Claude Code or Codex
 \`\`\`

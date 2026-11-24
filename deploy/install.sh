@@ -21,10 +21,30 @@ mkdir -p ~/.config/systemd/user ~/.config/muninn
 install -m644 "$here"/systemd/muninn-* ~/.config/systemd/user/
 systemctl --user daemon-reload
 [[ "${1:-}" == --no-start ]] && exit 0
-if [[ ! -s ~/.config/muninn/index.env ]]; then
-  echo "write ~/.config/muninn/index.env first (see deploy/index.env.example), then run this again" >&2
-  exit 1
-fi
+# The services refuse to start (and systemd restarts them in a loop) without these, so check first.
+check_env() {
+  local f=~/.config/muninn/index.env k v missing=()
+  if [[ ! -s $f ]]; then
+    echo "write $f first (start from index.env.example), then run this again" >&2
+    return 1
+  fi
+  setting() { sed -n "s/^$1=//p" "$f" | tail -1; }
+  for k in MUNINN_PG_URL MUNINN_EMBED_URL MUNINN_RERANK_URL MUNINN_REPOS_DIR MUNINN_INDEXD_TOKEN \
+           MUNINN_WEBHOOK_SECRET MUNINN_TOKENS_FILE; do
+    v=$(setting $k)
+    [[ -z $v || $v == *CHANGE_ME* ]] && missing+=("$k")
+  done
+  if (( ${#missing[@]} )); then
+    echo "set ${missing[*]} in $f (see index.env.example), then run this again" >&2
+    return 1
+  fi
+  v=$(setting MUNINN_TOKENS_FILE)
+  if [[ ! -s ${v/#\~/$HOME} ]]; then
+    echo "MUNINN_TOKENS_FILE ($v) does not exist yet: create it (README.md, Tokens and scopes), then run this again" >&2
+    return 1
+  fi
+}
+check_env || exit 1
 systemctl --user enable --now muninn-indexd muninn-mcp muninn-memoryd muninn-lifecycle.timer muninn-enroll.timer
 for u in muninn-indexd muninn-mcp muninn-memoryd muninn-indexweb muninn-watch; do
   systemctl --user is-enabled -q $u 2>/dev/null && systemctl --user restart $u

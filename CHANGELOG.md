@@ -23,6 +23,10 @@
   PATH), runs each SCIP indexer in its own memory-capped systemd scope, logs one `symbols_skipped`
   line instead of a failure per push when an indexer is missing, and leaves `MUNINN_SCIP_REPOS` to
   the muninn-scip timer.
+- `install.sh` checks `index.env` for the settings the services cannot start without (and that the
+  tokens file exists) before starting them, instead of leaving them in a restart loop;
+  `index.env.example` keeps comments on their own lines, since systemd keeps trailing comments in
+  the value.
 
 ## [0.1.0] - 2026-11-24
 
