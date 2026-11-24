@@ -13,6 +13,9 @@
 - `muninn-mcp` compares `MUNINN_MCP_TOKEN` in constant time.
 - `muninn-indexd` refuses to start without `MUNINN_WEBHOOK_SECRET`, and `/webhook/push` rejects
   every push when no secret is configured, instead of accepting unsigned pushes.
+- Memory recall always reranks its candidate window, so scores are on the reranker's scale even
+  when dense and full-text search agree on the top hit and the prompt hook's
+  `MUNINN_HOOK_MIN_SCORE` / `MUNINN_HOOK_REL_SCORE` mean the same thing for every prompt.
 
 ## [0.1.0] - 2026-11-24
 

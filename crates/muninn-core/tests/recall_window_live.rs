@@ -111,3 +111,61 @@ fn recall_reranks_up_to_twenty_candidates() {
     db.batch_execute(&format!("drop schema {SCHEMA} cascade"))
         .unwrap();
 }
+
+struct FixedRr(Arc<Mutex<usize>>);
+impl Reranker for FixedRr {
+    fn rerank(&self, _query: &str, docs: &[String]) -> Vec<f32> {
+        *self.0.lock().unwrap() += 1;
+        vec![0.25; docs.len()]
+    }
+}
+
+/// Dense and FTS both rank "item 3" first. Recall must still rerank, so its score is on the
+/// reranker's scale (0.25 x weights), not the normalised RRF 1.0 the agree shortcut used to give.
+#[test]
+fn recall_reranks_when_dense_and_fts_agree() {
+    const SCHEMA: &str = "recall_agree_test";
+    let Ok(url) = std::env::var("MUNINN_TEST_PG_URL") else {
+        return;
+    };
+    let mut db = postgres::Client::connect(&url, postgres::NoTls).unwrap();
+    db.batch_execute(&format!(
+        "drop schema if exists {SCHEMA} cascade; create schema {SCHEMA}; grant usage on schema {SCHEMA} to muninn_app"
+    ))
+    .unwrap();
+    let sep = if url.contains('?') { '&' } else { '?' };
+    let scoped = format!("{url}{sep}options=-c%20search_path%3D{SCHEMA}%2Cpublic");
+    let calls = Arc::new(Mutex::new(0));
+    let st =
+        MemStore::connect(&scoped, Box::new(FakeEmb), Box::new(FixedRr(calls.clone()))).unwrap();
+    let ctx = Ctx {
+        actor: OWNER.into(),
+        scopes: vec!["memory:read".into(), "memory:write".into()],
+        projects: vec![],
+        run_id: None,
+    };
+    for n in 0..4 {
+        let m = NewMem {
+            text: format!("zqxagree fact number item {n}"),
+            typ: "semantic".into(),
+            scope: "agent".into(),
+            project_id: None,
+            source: None,
+            confidence: 0.9,
+            importance: 0.5,
+            supersedes: None,
+        };
+        assert_eq!(st.remember(&ctx, &m).unwrap()["status"], "active");
+    }
+    let rec = st
+        .recall(&ctx, "zqxagree fact number item 3", Some("agent"), None, 3)
+        .unwrap();
+    assert_eq!(*calls.lock().unwrap(), 1, "{rec}");
+    let top = &rec["hits"][0];
+    assert_eq!(top["text"], "zqxagree fact number item 3", "{rec}");
+    let score = top["score"].as_f64().unwrap();
+    assert!(score > 0.2 && score <= 0.25, "{rec}");
+    drop(st);
+    db.batch_execute(&format!("drop schema {SCHEMA} cascade"))
+        .unwrap();
+}

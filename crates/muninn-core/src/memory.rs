@@ -1,7 +1,7 @@
 use crate::gate::{Lane, with_lane};
 use crate::index::{Embedder, Reranker};
 use crate::pg::DIM;
-use crate::rank::{rrf, top_agree};
+use crate::rank::rrf;
 use crate::recall_cache::{CacheKey, RecallCache};
 use crate::recall_latency::LatencyWindow;
 use postgres::{Client, NoTls, Transaction};
@@ -380,7 +380,6 @@ impl MemStore {
         let qv = self.embed_one(query).map(|v| vec_lit(&v));
         let hits = self.txn(ctx, |t| {
             let mut lists: Vec<Vec<String>> = Vec::new();
-            let mut dense: Vec<String> = Vec::new();
             if let Some(l) = &qv {
                 let r = t
                     .query(
@@ -391,8 +390,7 @@ impl MemStore {
                         &[l, &scope, &project],
                     )
                     .map_err(e)?;
-                dense = r.iter().map(|x| x.get(0)).collect();
-                lists.push(dense.clone());
+                lists.push(r.iter().map(|x| x.get(0)).collect());
             }
             let r = t
                 .query(
@@ -403,8 +401,7 @@ impl MemStore {
                     &[&query, &scope, &project],
                 )
                 .map_err(e)?;
-            let fts: Vec<String> = r.iter().map(|x| x.get(0)).collect();
-            lists.push(fts.clone());
+            lists.push(r.iter().map(|x| x.get(0)).collect());
             let fused = rrf(&lists);
             let top: Vec<String> = fused.iter().take(RECALL_RERANK_MAX).map(|x| x.0.clone()).collect();
             if top.is_empty() {
@@ -422,11 +419,11 @@ impl MemStore {
             let ordered: Vec<_> = top.iter().filter_map(|i| by.get(i).map(|r| (i.clone(), r))).collect();
             let window = ordered.len().min(recall_rerank_window(k));
             let docs: Vec<String> = ordered[..window].iter().map(|(_, r)| r.get::<_, String>(1)).collect();
-            let rs = if top_agree(&dense, &fts) {
-                vec![f32::MIN; docs.len()]
-            } else {
-                with_lane(Lane::Query, || self.rr.rerank(query, &docs))
-            };
+            // Always rerank, even when dense and FTS agree on the top hit: the window is small
+            // (10-20 short memories, about 70 ms) and a normalised RRF score is on another scale
+            // than reranker scores, so thresholds such as MUNINN_HOOK_MIN_SCORE would mean
+            // different things per query. RRF stays only as the fallback when the reranker is down.
+            let rs = with_lane(Lane::Query, || self.rr.rerank(query, &docs));
             let rrf_max = fused.first().map(|x| x.1).unwrap_or(1.0);
             let rrf_of: HashMap<&str, f64> = fused.iter().map(|x| (x.0.as_str(), x.1)).collect();
             let mut out: Vec<(f64, Value)> = ordered[..window]
