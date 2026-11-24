@@ -16,7 +16,8 @@ and the units below in `~/.config/systemd/user`. Settings live in `~/.config/mun
 | `muninn-scip.timer` | - | daily SCIP symbols for `MUNINN_SCIP_REPOS` |
 
 To serve other machines, set the binds to a LAN address or put a TLS reverse proxy in front of
-7411 and 7412 (and 7410 for the CLI). Every route except `/healthz` and `/readyz` needs a bearer.
+7411 and 7412 (and 7410 for the CLI). Every route except `/healthz`, `/readyz` and indexd's
+`/webhook/push` (signed with `MUNINN_WEBHOOK_SECRET` instead) needs a bearer.
 
 ## Tokens and scopes
 
@@ -29,7 +30,8 @@ To serve other machines, set the binds to a LAN address or put a TLS reverse pro
 - `memory:write`: remember. `memory:forget`: forget your own facts and decide review items.
 
 memoryd and mcp read the file at start: restart them after adding a token. Without the file, mcp falls back to a single
-`MUNINN_MCP_TOKEN` with `index:read` only (no memory tools).
+`MUNINN_MCP_TOKEN` with `index:read` only (no memory tools); with neither, mcp serves the index
+tools to anyone who can reach it.
 
 ## Reindex
 
