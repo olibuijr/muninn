@@ -775,6 +775,12 @@ async fn webhook(
         .as_str()
         .filter(|b| !b.is_empty() && !b.chars().all(|c| c == '0'))
         .map(String::from);
+    if !push_args_ok(repo, &branch, before.as_deref(), after) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "bad repository.name, ref, before or after"})),
+        );
+    }
     let (repo, a2) = (repo.to_string(), app.clone());
     let after = after.to_string();
     let Ok(permit) = app.gate.clone().acquire_owned().await else {
@@ -1320,6 +1326,21 @@ async fn repos(State(app): State<Arc<App>>) -> axum::response::Response {
 
 const MAX_VIEW: usize = 1024 * 1024;
 
+/// A git object id as push webhooks send it (hex, abbreviated or full SHA-1/SHA-256).
+fn object_id(s: &str) -> bool {
+    (7..=64).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Webhook fields go to git as a mirror path and as revisions: the repo must name a mirror in
+/// MUNINN_REPOS_DIR (no path), and before/after must be object ids, never `--option`s.
+fn push_args_ok(repo: &str, branch: &str, before: Option<&str>, after: &str) -> bool {
+    safe_ref(repo)
+        && !repo.contains('/')
+        && safe_ref(branch)
+        && object_id(after)
+        && before.is_none_or(object_id)
+}
+
 /// Reject anything that could escape the repo or be read as a git option.
 pub fn safe_ref(s: &str) -> bool {
     !s.is_empty()
@@ -1465,6 +1486,24 @@ pub fn require_token(router: Router, token: String) -> Router {
 #[cfg(test)]
 mod tests {
     use super::safe_ref;
+
+    #[test]
+    fn webhook_rejects_paths_and_options_as_push_fields() {
+        let sha = "0123456789abcdef0123456789abcdef01234567";
+        assert!(super::push_args_ok("api", "main", None, sha));
+        assert!(super::push_args_ok("api", "feature/x", Some(sha), sha));
+        assert!(!super::push_args_ok("../../etc", "main", None, sha));
+        assert!(!super::push_args_ok("a/b", "main", None, sha));
+        assert!(!super::push_args_ok("api", "../x", None, sha));
+        assert!(!super::push_args_ok("api", "main", None, "--output=/tmp/x"));
+        assert!(!super::push_args_ok(
+            "api",
+            "main",
+            Some("--output=/tmp/x"),
+            sha
+        ));
+        assert!(!super::push_args_ok("api", "main", None, "HEAD"));
+    }
 
     #[test]
     fn unscoped_search_orders_tied_repos_by_name() {

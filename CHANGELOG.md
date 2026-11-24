@@ -4,6 +4,8 @@
 
 - `muninn hook prompt` drops recalled memories that score below 0.6 of the best hit
   (`MUNINN_HOOK_REL_SCORE`), so one strong match no longer brings four weak ones into the prompt.
+- `muninn-indexd`: `/webhook/push` rejects a repository name that is a path and `before`/`after`
+  values that are not object ids, so they can no longer reach git as paths or options.
 
 ## [0.1.0] - 2026-11-24
 
