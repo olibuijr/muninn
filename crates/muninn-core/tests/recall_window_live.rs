@@ -97,7 +97,9 @@ fn recall_reranks_up_to_twenty_candidates() {
     let total = ITEMS + 1;
     for k in [3usize, 12, 20] {
         calls.lock().unwrap().clear();
-        let rec = st.recall(&ctx, "zqxwindow", Some("agent"), k).unwrap();
+        let rec = st
+            .recall(&ctx, "zqxwindow", Some("agent"), None, k)
+            .unwrap();
         let hits = rec["hits"].as_array().unwrap();
         assert_eq!(hits.len(), k.min(total), "k={k}: {rec}");
         let want = recall_rerank_window(k).min(total);

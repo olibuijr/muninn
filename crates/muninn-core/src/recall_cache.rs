@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 pub struct CacheKey {
     pub query: String,
     pub scope: Option<String>,
+    pub project: Option<String>,
     pub k: usize,
     pub caller: String,
     pub version: u64,
@@ -46,6 +47,7 @@ mod tests {
         CacheKey {
             query: q.into(),
             scope: None,
+            project: None,
             k: 8,
             caller: "a".into(),
             version,
@@ -63,6 +65,17 @@ mod tests {
         let mut c = RecallCache::new(2);
         c.put(key("q", 1), "v".into());
         assert!(c.get(&key("q", 2)).is_none());
+    }
+    #[test]
+    fn project_filter_is_part_of_the_key() {
+        let mut c = RecallCache::new(4);
+        c.put(key("q", 1), "all".into());
+        let mut p = key("q", 1);
+        p.project = Some("api".into());
+        assert!(c.get(&p).is_none());
+        c.put(p.clone(), "api".into());
+        assert_eq!(c.get(&p).as_deref(), Some("api"));
+        assert_eq!(c.get(&key("q", 1)).as_deref(), Some("all"));
     }
     #[test]
     fn evicts_least_recently_used() {

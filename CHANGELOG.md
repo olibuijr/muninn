@@ -6,6 +6,8 @@
   (`MUNINN_HOOK_REL_SCORE`), so one strong match no longer brings four weak ones into the prompt.
 - `muninn-indexd`: `/webhook/push` rejects a repository name that is a path and `before`/`after`
   values that are not object ids, so they can no longer reach git as paths or options.
+- Memory recall honours `project_id` (`muninn recall --project P`, memoryd `/recall`, the MCP
+  `recall` tool): only memories stored with that project are returned.
 
 ## [0.1.0] - 2026-11-24
 

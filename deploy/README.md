@@ -72,7 +72,8 @@ heavy build that takes the same lock. Other knobs: `MUNINN_RUST_ANALYZER`, `MUNI
   Cosine >= 0.97 with rerank agreement is a duplicate; 0.85-0.97, confidence below 0.6 or a
   conflict with an active fact goes to the review queue.
 - `POST /recall {query, k?, scope?, project_id?}`: hybrid recall, reranked over the top
-  `clamp(k, 10, 20)` candidates.
+  `clamp(k, 10, 20)` candidates. `project_id` keeps only memories stored with that project
+  (row-level security still applies).
 - `POST /forget {id}`: tombstone (text and vector removed, audit row kept).
 - Review queue: `muninn review list | approve ID [--supersede] | reject ID | approve-all --older-than 7d`.
 - `muninn-memoryd lifecycle all` (weekly timer): consolidates clusters of old episodic memories,

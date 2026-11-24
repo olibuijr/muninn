@@ -50,6 +50,13 @@ pub fn new_mem(b: &Value) -> Result<NewMem, String> {
     })
 }
 
+/// A recall request: (query, scope, project_id, k).
+pub fn recall_req(b: &Value) -> Result<(String, Option<String>, Option<String>, usize), String> {
+    let q = s(b, "query").ok_or("query required")?;
+    let k = b["k"].as_u64().unwrap_or(8) as usize;
+    Ok((q, s(b, "scope"), s(b, "project_id"), k))
+}
+
 async fn dispatch(app: Arc<App>, h: HeaderMap, path: &'static str, b: Value) -> Res {
     let hv = h.get("authorization").and_then(|v| v.to_str().ok());
     let run = h
@@ -66,15 +73,9 @@ async fn dispatch(app: Arc<App>, h: HeaderMap, path: &'static str, b: Value) -> 
         let st = &app.store;
         fin(match path {
             "remember" => new_mem(&b).and_then(|m| st.remember(&ctx, &m)),
-            "recall" => match s(&b, "query") {
-                Some(q) => st.recall(
-                    &ctx,
-                    &q,
-                    b["scope"].as_str(),
-                    b["k"].as_u64().unwrap_or(8) as usize,
-                ),
-                None => Err("query required".into()),
-            },
+            "recall" => recall_req(&b).and_then(|(q, scope, project, k)| {
+                st.recall(&ctx, &q, scope.as_deref(), project.as_deref(), k)
+            }),
             "forget" => match s(&b, "id") {
                 Some(i) => st.forget(&ctx, &i),
                 None => Err("id required".into()),
@@ -141,4 +142,24 @@ pub fn router(app: Arc<App>) -> Router {
     r = route!(r, "stats");
     r = route!(r, "review/decide");
     r.with_state(app)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::recall_req;
+    use serde_json::json;
+
+    #[test]
+    fn recall_request_reads_project_id() {
+        let (q, scope, project, k) =
+            recall_req(&json!({"query": "q", "scope": "project", "project_id": "api", "k": 3}))
+                .unwrap();
+        assert_eq!(
+            (q.as_str(), scope.as_deref(), project.as_deref(), k),
+            ("q", Some("project"), Some("api"), 3)
+        );
+        let (_, scope, project, k) = recall_req(&json!({"query": "q"})).unwrap();
+        assert_eq!((scope, project, k), (None, None, 8));
+        assert!(recall_req(&json!({"project_id": "api"})).is_err());
+    }
 }

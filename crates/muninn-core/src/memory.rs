@@ -309,9 +309,18 @@ impl MemStore {
         self.corpus_version.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn recall(&self, ctx: &Ctx, query: &str, scope: Option<&str>, k: usize) -> R<Value> {
+    /// Hybrid recall. `scope` and `project` narrow the result (a project keeps only memories whose
+    /// `project_id` equals it); row-level security still decides what the caller may see at all.
+    pub fn recall(
+        &self,
+        ctx: &Ctx,
+        query: &str,
+        scope: Option<&str>,
+        project: Option<&str>,
+        k: usize,
+    ) -> R<Value> {
         let started = Instant::now();
-        let out = self.recall_inner(ctx, query, scope, k);
+        let out = self.recall_inner(ctx, query, scope, project, k);
         self.recall_latency
             .lock()
             .unwrap_or_else(|p| p.into_inner())
@@ -319,7 +328,14 @@ impl MemStore {
         out
     }
 
-    fn recall_inner(&self, ctx: &Ctx, query: &str, scope: Option<&str>, k: usize) -> R<Value> {
+    fn recall_inner(
+        &self,
+        ctx: &Ctx,
+        query: &str,
+        scope: Option<&str>,
+        project: Option<&str>,
+        k: usize,
+    ) -> R<Value> {
         if !ctx.has("memory:read") {
             return Err("forbidden: memory:read required".into());
         }
@@ -327,6 +343,7 @@ impl MemStore {
         let key = CacheKey {
             query: query.to_string(),
             scope: scope.map(String::from),
+            project: project.map(String::from),
             k,
             caller: format!(
                 "{}|{}|{}",
@@ -344,7 +361,7 @@ impl MemStore {
         if let Some(v) = cached.and_then(|s| serde_json::from_str(&s).ok()) {
             return Ok(v);
         }
-        let out = self.recall_uncached(ctx, query, scope, k)?;
+        let out = self.recall_uncached(ctx, query, scope, project, k)?;
         self.cache
             .lock()
             .unwrap_or_else(|p| p.into_inner())
@@ -352,7 +369,14 @@ impl MemStore {
         Ok(out)
     }
 
-    fn recall_uncached(&self, ctx: &Ctx, query: &str, scope: Option<&str>, k: usize) -> R<Value> {
+    fn recall_uncached(
+        &self,
+        ctx: &Ctx,
+        query: &str,
+        scope: Option<&str>,
+        project: Option<&str>,
+        k: usize,
+    ) -> R<Value> {
         let qv = self.embed_one(query).map(|v| vec_lit(&v));
         let hits = self.txn(ctx, |t| {
             let mut lists: Vec<Vec<String>> = Vec::new();
@@ -362,8 +386,9 @@ impl MemStore {
                     .query(
                         "select id::text from memory where status='active' and emb is not null
                            and (valid_until is null or valid_until>now()) and ($2::text is null or scope=$2)
+                           and ($3::text is null or project_id=$3)
                          order by emb <=> $1::text::vector limit 50",
-                        &[l, &scope],
+                        &[l, &scope, &project],
                     )
                     .map_err(e)?;
                 dense = r.iter().map(|x| x.get(0)).collect();
@@ -373,8 +398,9 @@ impl MemStore {
                 .query(
                     "select id::text from memory where status='active' and tsv @@ websearch_to_tsquery('english',$1)
                        and (valid_until is null or valid_until>now()) and ($2::text is null or scope=$2)
+                       and ($3::text is null or project_id=$3)
                      order by ts_rank_cd(tsv, websearch_to_tsquery('english',$1)) desc limit 50",
-                    &[&query, &scope],
+                    &[&query, &scope, &project],
                 )
                 .map_err(e)?;
             let fts: Vec<String> = r.iter().map(|x| x.get(0)).collect();

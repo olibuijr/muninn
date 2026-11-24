@@ -67,7 +67,8 @@ pub fn all_tools() -> Vec<Value> {
     v.push(json!({"name": "recall", "title": "Recall memory",
         "description": "Hybrid (FTS + dense, RRF) + rerank recall over agent memory; score = rerank x (0.7 + 0.2 importance + 0.1 recency). Returns citations.",
         "inputSchema": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string"},
-            "scope": {"type": "string", "enum": ["global", "project", "agent"]}, "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 8}}},
+            "scope": {"type": "string", "enum": ["global", "project", "agent"]},
+            "project_id": {"type": "string", "description": "Only memories stored with this project_id."}, "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 8}}},
         "outputSchema": {"type": "object", "required": ["hits"], "properties": {"hits": {"type": "array", "items": {"type": "object",
             "required": ["id", "text", "type", "scope", "score"], "properties": {"id": {"type": "string"}, "text": {"type": "string"},
             "type": {"type": "string"}, "scope": {"type": "string"}, "project_id": {"type": ["string", "null"]},
@@ -763,6 +764,18 @@ mod tests {
         assert!(number_lines("a\nb\nc\n", Some(3), Some(2)).is_err());
         assert_eq!(number_lines("", None, None).unwrap().3, 0);
         assert_eq!(number_lines("a\nb\n", Some(1), Some(99)).unwrap().2, 2);
+    }
+
+    #[test]
+    fn recall_tool_takes_project_id() {
+        let t = super::all_tools()
+            .into_iter()
+            .find(|t| t["name"] == "recall")
+            .unwrap();
+        assert_eq!(
+            t["inputSchema"]["properties"]["project_id"]["type"],
+            "string"
+        );
     }
 
     #[test]

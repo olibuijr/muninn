@@ -84,7 +84,7 @@ fn consolidate_expire_reembed() {
         .get(0);
     assert_eq!(stale, 0);
     let rec = st
-        .recall(&ctx, "muninn-indexd deploy on staging", None, 3)
+        .recall(&ctx, "muninn-indexd deploy on staging", None, None, 3)
         .unwrap();
     assert!(
         rec["hits"][0]["text"]
