@@ -60,7 +60,7 @@ such as two `llama-server` processes.
 ```sh
 curl -LO https://github.com/olibuijr/muninn/releases/latest/download/muninn-x86_64-linux.tar.gz
 tar xzf muninn-x86_64-linux.tar.gz && cd muninn-x86_64-linux
-cp index.env.example ~/.config/muninn/index.env   # then fill it in (mode 0600)
+mkdir -p ~/.config/muninn && cp index.env.example ~/.config/muninn/index.env   # fill it in, mode 0600
 ./install.sh                                      # binaries, systemd user units, start
 ```
 
